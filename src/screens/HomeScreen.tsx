@@ -48,7 +48,7 @@ type HomeNav = CompositeNavigationProp<
 
 const { width: windowWidth } = Dimensions.get('window');
 const listHorizontalPad = roundLayout(Math.min(scale(20), windowWidth * 0.06));
-const BRAND_IMAGE = require('../assets/synestia-background.png');
+const BRAND_IMAGE = require('../assets/synestia_background.png');
 
 const safeEdges = ['top', 'left', 'right', 'bottom'] as const;
 

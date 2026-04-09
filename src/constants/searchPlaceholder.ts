@@ -1,3 +1,3 @@
-/** Kapak yoksa Keşfet satırlarında kullanılır (`assets/no-image.png`). */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-export const NO_SEARCH_IMAGE = require('../../assets/no-image.png') as number;
+/** Kapak yoksa Keşfet satırlarında kullanılır. */
+// Yerel asset yerine bir URL kullanıyoruz, böylece build hatası almazsın.
+export const NO_SEARCH_IMAGE = { uri: 'https://via.placeholder.com/150' };

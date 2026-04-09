@@ -17,6 +17,17 @@ module.exports = ({ config }) => ({
         photosPermission: 'Profil fotoğrafı için galeriye erişim gerekir.',
       },
     ],
+    [
+      'expo-build-properties',
+      {
+        android: {
+          extraMavenRepos: [
+            'https://maven.google.com',
+            'https://jcenter.bintray.com',
+          ],
+        },
+      },
+    ],
   ],
   extra: {
     ...(config.extra ?? {}),

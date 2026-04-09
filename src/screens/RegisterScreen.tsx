@@ -20,7 +20,7 @@ import { colors, radii, spacing, spacingVertical, typography } from '../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
-const BG = require('../assets/synestia-background.png');
+const BG = require('../assets/synestia_background.png');
 
 export function RegisterScreen({ navigation }: Props) {
   const { signUp, firebaseConfigured } = useAuth();
