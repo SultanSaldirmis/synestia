@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Synestia",
+    "slug": "synestia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.synestia.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#121212"
+      },
+      "package": "com.synestia.app"
+    },
+    "scheme": "synestia",
+    "plugins": [
+      "expo-asset"
+    ],
+    "extra": {
+      "firebase": {
+        "apiKey": "AIzaSyD7lRbQW2lb6FidJeYZqJMXb72f25QxTS4",
+        "authDomain": "synestia-ddf6a.firebaseapp.com",
+        "projectId": "synestia-ddf6a",
+        "storageBucket": "synestia-ddf6a.firebasestorage.app",
+        "messagingSenderId": "483448476875",
+        "appId": "1:483448476875:web:57640233b2d2546e52b74e"
+      },
+      "tmdbApiKey": "2849ed171c705202793eabbd5deca82d",
+      "spotifyClientId": "a1b38cf450dc42e1aba63dd52d6138bc",
+      "spotifyClientSecret": "3f4f1c7f3496405f92efff89825bdda9",
+      "eas": {
+        "projectId": "f8471156-4687-4868-a0c5-72b149e9eef9"
+      }
+    }
+  }
+}
