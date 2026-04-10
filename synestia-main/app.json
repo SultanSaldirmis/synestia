@@ -26,6 +26,22 @@
     "scheme": "synestia",
     "plugins": [
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "firebase": {
+        "apiKey": "",
+        "authDomain": "",
+        "projectId": "",
+        "storageBucket": "",
+        "messagingSenderId": "",
+        "appId": ""
+      },
+      "tmdbApiKey": "",
+      "spotifyClientId": "",
+      "spotifyClientSecret": "",
+      "eas": {
+        "projectId": "5f16c01f-b21b-4ee6-81e0-7b6ccc1216cc"
+      }
+    }
   }
 }

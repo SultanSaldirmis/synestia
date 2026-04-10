@@ -19,7 +19,7 @@ import { colors, radii, scale, spacing, spacingVertical, typography, verticalSca
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-const BG = require('../assets/synestia-background.png');
+const BG = require('../assets/background.png');
 
 export function LoginScreen({ navigation }: Props) {
   const { signIn, firebaseConfigured, resetPassword } = useAuth();
