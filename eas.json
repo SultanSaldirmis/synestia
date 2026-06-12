@@ -9,16 +9,36 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyD7lRbQW2lb6FidJeYZqJMXb72f25QxTS4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "synestia-ddf6a.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "synestia-ddf6a",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "synestia-ddf6a.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "483448476875",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:483448476875:web:57640233b2d2546e52b74e",
+        "EXPO_PUBLIC_MOCKAPI_FEEDBACK_URL": "https://69d1514b90cd06523d5e04eb.mockapi.io/api/Get/feedbacks",
+        "EXPO_PUBLIC_TMDB_API_KEY": "2849ed171c705202793eabbd5deca82d",
+        "EXPO_PUBLIC_SPOTIFY_CLIENT_ID": "a1b38cf450dc42e1aba63dd52d6138bc",
+        "EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET": "3f4f1c7f3496405f92efff89825bdda9"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "cache": {
-        "key": "gradle-deps-v1",
-        "paths": [
-          "~/.gradle/caches",
-          "~/.gradle/wrapper"
-        ]
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyD7lRbQW2lb6FidJeYZqJMXb72f25QxTS4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "synestia-ddf6a.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "synestia-ddf6a",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "synestia-ddf6a.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "483448476875",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:483448476875:web:57640233b2d2546e52b74e",
+        "EXPO_PUBLIC_MOCKAPI_FEEDBACK_URL": "https://69d1514b90cd06523d5e04eb.mockapi.io/api/Get/feedbacks",
+        "EXPO_PUBLIC_TMDB_API_KEY": "2849ed171c705202793eabbd5deca82d",
+        "EXPO_PUBLIC_SPOTIFY_CLIENT_ID": "a1b38cf450dc42e1aba63dd52d6138bc",
+        "EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET": "3f4f1c7f3496405f92efff89825bdda9"
       }
     }
   },

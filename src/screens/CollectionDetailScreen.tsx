@@ -8,6 +8,7 @@ import type { AppStackParamList } from '../navigation/types';
 import { searchBooksAsResults, searchSpotifyTracksAsResults, searchTmdbMoviesAsResults } from '../services/apiService';
 import {
   deleteUserCollection,
+  removeItemFromCollection,
   saveContentToUserCollection,
   subscribeCollectionItems,
   type CollectionItemDoc,
@@ -78,6 +79,26 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
+  const confirmRemoveItem = (item: CollectionItemDoc) => {
+    if (!user?.uid || !isOwner) return;
+    Alert.alert('Öğeyi sil', `"${item.title}" koleksiyondan kaldırılsın mı?`, [
+      { text: 'İptal', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await removeItemFromCollection(user.uid, collectionId, item.id);
+            } catch (e) {
+              Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   const onAdd = async (r: SearchResult) => {
     if (!user?.uid || !isOwner) return;
     try {
@@ -132,25 +153,37 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
           keyExtractor={(i) => i.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => {
-                if (item.contentType === 'music') return;
-                const u = item.externalUrl?.trim();
-                if (u) void Linking.openURL(u);
-              }}
-            >
-              {item.imageUrl ? (
-                <CachedImage uri={item.imageUrl} style={styles.thumb} />
-              ) : (
-                <View style={[styles.thumb, styles.thumbPlaceholder]}>
-                  <Ionicons name="document-text-outline" size={scale(24)} color={colors.textMuted} />
-                </View>
+            <View style={styles.rowWrap}>
+              <Pressable
+                style={({ pressed }) => [styles.row, styles.rowFlex, pressed && styles.rowPressed]}
+                onPress={() => {
+                  if (item.contentType === 'music') return;
+                  const u = item.externalUrl?.trim();
+                  if (u) void Linking.openURL(u);
+                }}
+              >
+                {item.imageUrl ? (
+                  <CachedImage uri={item.imageUrl} style={styles.thumb} />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                    <Ionicons name="document-text-outline" size={scale(24)} color={colors.textMuted} />
+                  </View>
+                )}
+                <Text style={styles.rowTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+              </Pressable>
+              {isOwner && (
+                <Pressable
+                  onPress={() => confirmRemoveItem(item)}
+                  hitSlop={8}
+                  style={styles.deleteHit}
+                  accessibilityLabel="Öğeyi sil"
+                >
+                  <Ionicons name="trash-outline" size={scale(18)} color={colors.danger} />
+                </Pressable>
               )}
-              <Text style={styles.rowTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
-            </Pressable>
+            </View>
           )}
         />
       )}
@@ -210,6 +243,12 @@ const styles = StyleSheet.create({
     fontSize: scale(18),
   },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacingVertical.xxl },
+  rowWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacingVertical.sm,
+  },
+  rowFlex: { flex: 1, marginBottom: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -220,6 +259,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     marginBottom: spacingVertical.sm,
+  },
+  deleteHit: {
+    padding: spacing.sm,
+    marginLeft: spacing.sm,
   },
   thumb: {
     width: scale(56),

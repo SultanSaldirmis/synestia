@@ -45,6 +45,19 @@ module.exports = ({ config }) => {
         },
       ],
       [
+        'expo-camera',
+        {
+          cameraPermission: 'Fotoğraf çekmek için kameraya erişim gerekir.',
+        },
+      ],
+      [
+        'expo-location',
+        {
+          locationAlwaysAndWhenInUsePermission: 'Konumunuzu haritada göstermek için konum erişimi gerekir.',
+        },
+      ],
+      'expo-sqlite',
+      [
         'expo-build-properties',
         {
           android: {

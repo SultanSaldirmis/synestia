@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import {
   Alert,
-  Button,
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
@@ -10,62 +8,66 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { showMessage } from 'react-native-flash-message';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+
 import { useAuth } from '../context/AuthContext';
 import type { AuthStackParamList } from '../navigation/types';
 import { colors, radii, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
+import { loginSchema, type LoginFormValues } from '../validation/authSchemas';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 const BG = require('../assets/synestia_background.png');
 
 export function LoginScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { signIn, firebaseConfigured, resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit() {
-    setError(null);
+  const {
+    control,
+    handleSubmit,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: yupResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  async function onSubmit(data: LoginFormValues) {
     if (!firebaseConfigured) {
-      setError(
-        'Servise şu anda bağlanılamıyor. Lütfen daha sonra tekrar deneyin.',
-      );
+      showMessage({ message: t('auth.serverUnavailable'), type: 'warning' });
       return;
     }
-    if (!email.trim() || !password) {
-      setError('E-posta ve şifre gerekli.');
-      return;
-    }
-    setBusy(true);
     try {
-      await signIn(email, password);
+      await signIn(data.email, data.password);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Giriş başarısız.';
-      setError(msg);
-    } finally {
-      setBusy(false);
+      showMessage({ message: msg, type: 'danger' });
     }
   }
 
   async function onForgotPassword() {
     if (!firebaseConfigured) {
-      Alert.alert('Uyarı', 'Şifre sıfırlama şu anda kullanılamıyor.');
+      Alert.alert(t('common.error'), t('auth.serverUnavailable'));
       return;
     }
-    const targetEmail = email.trim();
-    if (!targetEmail) {
-      Alert.alert('E-posta gerekli', 'Önce e-posta alanını doldurun.');
+    const email = getValues('email').trim();
+    if (!email) {
+      showMessage({ message: t('auth.resetEmailRequired'), type: 'warning' });
       return;
     }
     try {
-      await resetPassword(targetEmail);
-      Alert.alert('Başarılı', 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.');
+      await resetPassword(email);
+      showMessage({ message: t('auth.resetSent'), type: 'success' });
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Şifre sıfırlama gönderilemedi.');
+      showMessage({ message: e instanceof Error ? e.message : 'Hata', type: 'danger' });
     }
   }
 
@@ -77,43 +79,66 @@ export function LoginScreen({ navigation }: Props) {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.flex}
         >
-          <Text style={styles.logo}>Synestia</Text>
-          <Text style={styles.tagline}>Müzik · Film · Kitap — tek sosyal akış</Text>
+          <Text style={styles.logo}>{t('common.appName')}</Text>
+          <Text style={styles.tagline}>{t('auth.tagline')}</Text>
 
-          {!firebaseConfigured ? (
+          {!firebaseConfigured && (
             <View style={styles.warnBox}>
-              <Text style={styles.warnText}>
-                Sunucu bağlantısı şu anda kullanılamıyor. Kısa süre sonra yeniden deneyin.
-              </Text>
+              <Text style={styles.warnText}>{t('auth.serverUnavailable')}</Text>
             </View>
-          ) : null}
+          )}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Text style={styles.label}>E-posta</Text>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            placeholder="ornek@edu.tr"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
+          <Text style={styles.label}>{t('auth.email')}</Text>
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                style={[styles.input, errors.email && styles.inputError]}
+                placeholder={t('auth.emailPlaceholder')}
+                placeholderTextColor={colors.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
           />
+          {errors.email && <Text style={styles.fieldError}>{errors.email.message}</Text>}
 
-          <Text style={styles.label}>Şifre</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
+          <Text style={styles.label}>{t('auth.password')}</Text>
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                style={[styles.input, errors.password && styles.inputError]}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+              />
+            )}
           />
+          {errors.password && <Text style={styles.fieldError}>{errors.password.message}</Text>}
 
-          <View style={styles.nativeButtonWrap}>
-            <Button title={busy ? 'Giriş Yapılıyor...' : 'Giriş Yap'} onPress={() => void onSubmit()} color="#A855F7" />
+          <View style={styles.submitBtn}>
+            <TouchableOpacity
+              onPress={() => void handleSubmit(onSubmit)()}
+              disabled={isSubmitting}
+              style={[styles.btn, isSubmitting && styles.btnDisabled]}
+              activeOpacity={0.85}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={colors.textOnAccent} />
+              ) : (
+                <Text style={styles.btnText}>{t('auth.login')}</Text>
+              )}
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -121,10 +146,14 @@ export function LoginScreen({ navigation }: Props) {
             style={styles.linkWrap}
             activeOpacity={0.85}
           >
-            <Text style={styles.link}>Hesabın yok mu? Kayıt ol</Text>
+            <Text style={styles.link}>{t('auth.noAccount')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => void onForgotPassword()} style={styles.forgotWrap} activeOpacity={0.85}>
-            <Text style={styles.forgot}>Şifremi Unuttum</Text>
+          <TouchableOpacity
+            onPress={() => void onForgotPassword()}
+            style={styles.forgotWrap}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.forgot}>{t('auth.forgotPassword')}</Text>
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -133,17 +162,12 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bg: {
-    flex: 1,
-  },
+  bg: { flex: 1 },
   dim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(8, 10, 18, 0.72)',
   },
-  safe: {
-    flex: 1,
-    position: 'relative',
-  },
+  safe: { flex: 1, position: 'relative' },
   flex: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -169,15 +193,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacingVertical.md,
   },
-  warnText: {
-    ...typography.meta,
-    color: colors.accentBlue,
-  },
-  error: {
-    ...typography.meta,
-    color: colors.danger,
-    marginBottom: spacingVertical.sm,
-  },
+  warnText: { ...typography.meta, color: colors.accentBlue },
   label: {
     ...typography.caption,
     color: colors.textMuted,
@@ -193,27 +209,28 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacingVertical.sm,
-    marginBottom: spacingVertical.md,
+    marginBottom: verticalScale(2),
   },
-  linkWrap: {
-    marginTop: spacingVertical.lg,
-    alignItems: 'center',
-  },
-  link: {
-    ...typography.subtitle,
-    color: colors.accentBlue,
-  },
-  forgotWrap: {
-    marginTop: spacingVertical.sm,
-    alignItems: 'center',
-  },
-  forgot: {
+  inputError: { borderColor: colors.danger },
+  fieldError: {
     ...typography.meta,
-    color: colors.textMuted,
+    color: colors.danger,
+    marginBottom: spacingVertical.sm,
   },
-  nativeButtonWrap: {
-    marginTop: spacingVertical.sm,
+  submitBtn: { marginTop: spacingVertical.sm },
+  btn: {
+    backgroundColor: colors.accentPurple,
     borderRadius: radii.md,
-    overflow: 'hidden',
+    paddingVertical: spacingVertical.md,
+    alignItems: 'center',
   },
+  btnDisabled: { opacity: 0.7 },
+  btnText: {
+    ...typography.button,
+    color: colors.textOnAccent,
+  },
+  linkWrap: { marginTop: spacingVertical.lg, alignItems: 'center' },
+  link: { ...typography.subtitle, color: colors.accentBlue },
+  forgotWrap: { marginTop: spacingVertical.sm, alignItems: 'center' },
+  forgot: { ...typography.meta, color: colors.textMuted },
 });

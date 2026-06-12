@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 import type { User } from 'firebase/auth';
 
 import { isFirebaseConfigured } from '../config/firebase';
@@ -10,6 +10,8 @@ import {
   registerWithEmail,
   sendResetPasswordEmail,
 } from '../services/authService';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { setUser, clearAuth, setAuthReady } from '../store/authSlice';
 
 type AuthContextValue = {
   user: User | null;
@@ -23,24 +25,39 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Firebase User nesnesi serileştirilemez; Redux için düz objeye çevir
+function toSerializable(u: User | null) {
+  if (!u) return null;
+  return {
+    uid: u.uid,
+    email: u.email,
+    displayName: u.displayName,
+    photoURL: u.photoURL,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const dispatch = useAppDispatch();
+  const reduxUser = useAppSelector((s) => s.auth.user);
+  const authReady = useAppSelector((s) => s.auth.authReady);
 
   const firebaseConfigured = isFirebaseConfigured();
 
   useEffect(() => {
     if (!firebaseConfigured) {
-      setUser(null);
-      setAuthReady(true);
+      dispatch(clearAuth());
       return;
     }
-    const unsub = observeAuth((u) => {
-      setUser(u);
-      setAuthReady(true);
+    const unsub = observeAuth((u: User | null) => {
+      if (u) {
+        dispatch(setUser(toSerializable(u)));
+      } else {
+        dispatch(setUser(null));
+        dispatch(setAuthReady());
+      }
     });
     return unsub;
-  }, [firebaseConfigured]);
+  }, [firebaseConfigured, dispatch]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await loginWithEmail(email, password);
@@ -53,15 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     if (!firebaseConfigured) return;
     await logoutFirebase();
-  }, [firebaseConfigured]);
+    dispatch(clearAuth());
+  }, [firebaseConfigured, dispatch]);
 
   const resetPassword = useCallback(async (email: string) => {
     await sendResetPasswordEmail(email);
   }, []);
 
+  // Context değeri Firebase User uyumluluğu için reduxUser'ı user olarak sunar
   const value = useMemo(
     () => ({
-      user,
+      user: reduxUser as unknown as User | null,
       authReady,
       firebaseConfigured,
       signIn,
@@ -69,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       resetPassword,
     }),
-    [user, authReady, firebaseConfigured, signIn, signUp, signOut, resetPassword],
+    [reduxUser, authReady, firebaseConfigured, signIn, signUp, signOut, resetPassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

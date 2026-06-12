@@ -1,3 +1,2 @@
 /** Kapak yoksa Keşfet satırlarında kullanılır. */
-// Yerel asset yerine bir URL kullanıyoruz, böylece build hatası almazsın.
-export const NO_SEARCH_IMAGE = { uri: 'https://via.placeholder.com/150' };
+export const NO_SEARCH_IMAGE_URI = 'https://via.placeholder.com/150';

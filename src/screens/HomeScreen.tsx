@@ -12,6 +12,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -20,6 +21,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { PostCard, ScreenSafeArea } from '../components';
+import { useDrawer } from '../navigation/DrawerNavigator';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { isFirebaseConfigured } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +57,7 @@ const safeEdges = ['top', 'left', 'right', 'bottom'] as const;
 export function HomeScreen() {
   const navigation = useNavigation<HomeNav>();
   const { user } = useAuth();
+  const { openDrawer } = useDrawer();
   const [feedReady, setFeedReady] = useState(false);
   const [fsPosts, setFsPosts] = useState<FeedPost[]>([]);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
@@ -451,6 +454,14 @@ export function HomeScreen() {
         <View style={styles.brandHeader}>
           <Image source={BRAND_IMAGE} style={styles.brandLogo} resizeMode="cover" />
           <Text style={styles.brandTitle}>Synestia</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            onPress={openDrawer}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.hamburgerBtn}
+          >
+            <Ionicons name="menu" size={scale(26)} color={colors.textPrimary} />
+          </TouchableOpacity>
         </View>
         <FlatList
           ref={flatListRef}
@@ -505,6 +516,9 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
     color: colors.textPrimary,
     fontWeight: '700',
+  },
+  hamburgerBtn: {
+    padding: spacing.xs,
   },
   loadingWrap: {
     flex: 1,

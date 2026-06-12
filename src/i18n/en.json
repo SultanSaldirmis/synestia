@@ -1,0 +1,124 @@
+{
+  "common": {
+    "appName": "Synestia",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "retry": "Retry",
+    "close": "Close",
+    "back": "Back",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "auth": {
+    "login": "Sign In",
+    "register": "Sign Up",
+    "logout": "Sign Out",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display Name",
+    "emailPlaceholder": "example@edu.tr",
+    "passwordPlaceholder": "At least 6 characters",
+    "namePlaceholder": "Full Name",
+    "tagline": "Music · Film · Book — one social feed",
+    "noAccount": "No account? Sign up",
+    "hasAccount": "Back to sign in",
+    "forgotPassword": "Forgot Password",
+    "createAccount": "Create Account",
+    "joinCommunity": "Fill in your details to join the Synestia community.",
+    "loggingIn": "Signing in...",
+    "registering": "Registering...",
+    "resetSent": "Password reset link has been sent to your email address.",
+    "resetEmailRequired": "Please fill in the email field first.",
+    "serverUnavailable": "Service is currently unavailable. Please try again later."
+  },
+  "validation": {
+    "emailRequired": "Email address is required",
+    "emailInvalid": "Please enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordMin": "Password must be at least 6 characters",
+    "nameRequired": "Full name is required",
+    "nameMin": "Name must be at least 2 characters",
+    "passwordConfirmRequired": "Password confirmation is required",
+    "passwordMismatch": "Passwords do not match"
+  },
+  "tabs": {
+    "feed": "Feed",
+    "explore": "Explore",
+    "profile": "Profile",
+    "notifications": "Notifications"
+  },
+  "home": {
+    "title": "Feed",
+    "noContent": "No content yet",
+    "createFirst": "Create your first post"
+  },
+  "explore": {
+    "title": "Explore",
+    "searchPlaceholder": "Search music, films, books or users...",
+    "all": "All",
+    "music": "Music",
+    "film": "Film",
+    "book": "Book",
+    "user": "User",
+    "noResults": "No results found"
+  },
+  "profile": {
+    "title": "Profile",
+    "editProfile": "Edit Profile",
+    "posts": "Posts",
+    "collections": "Collections",
+    "followers": "Followers",
+    "following": "Following",
+    "settings": "Settings",
+    "privateAccount": "Private account",
+    "privateAccountDesc": "In a private account, only approved followers can see your posts and collections.",
+    "createCollection": "Create collection",
+    "noPost": "No posts yet"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "noNotifications": "No notifications yet",
+    "followRequest": "wants to follow you",
+    "newFollower": "started following you",
+    "likedPost": "liked your post",
+    "commentedPost": "commented on your post",
+    "accept": "Accept",
+    "reject": "Reject"
+  },
+  "settings": {
+    "language": "Language",
+    "selectLanguage": "Select Language",
+    "turkish": "Turkish",
+    "english": "English"
+  },
+  "drawer": {
+    "mainApp": "Main App",
+    "momentCapture": "Capture Moment"
+  },
+  "camera": {
+    "title": "Capture Moment",
+    "takePhoto": "Take New Photo",
+    "updatePhoto": "Update Photo",
+    "photoSaved": "Photo saved",
+    "manualLocation": "Select Location Manually",
+    "gpsLocation": "Get GPS Location",
+    "locationSaved": "Location saved",
+    "locationPreview": "Location Preview",
+    "gpsLoading": "Getting location...",
+    "saved": "Moment saved successfully!",
+    "permissionDenied": "Camera permission denied",
+    "locationPermissionDenied": "Location permission denied"
+  },
+  "map": {
+    "title": "Select Location",
+    "confirm": "Confirm Location",
+    "hint": "Tap on the map to select your location"
+  }
+}

@@ -20,7 +20,8 @@ import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { PostCard, ProfileImageZoomModal, ScreenSafeArea } from '../components';
+import { useTranslation } from 'react-i18next';
+import { PostCard, ProfileImageZoomModal, ScreenSafeArea, LanguageSheet } from '../components';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_USER } from '../data/mockData';
@@ -73,6 +74,7 @@ const TABS: { key: ContentTab; label: string }[] = [
 
 export function ProfileScreen() {
   const navigation = useNavigation<ProfileNav>();
+  const { t } = useTranslation();
   const { user, signOut, firebaseConfigured } = useAuth();
   const [profile, setProfile] = useState<UserProfileDoc | null>(null);
   const [contentTab, setContentTab] = useState<ContentTab>('posts');
@@ -671,9 +673,12 @@ export function ProfileScreen() {
       <Modal visible={settingsOpen} transparent animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setSettingsOpen(false)} />
         <View style={styles.modalSheet}>
-          <Text style={styles.modalTitle}>Ayarlar</Text>
+          <Text style={styles.modalTitle}>{t('profile.settings')}</Text>
+          <View style={{ marginBottom: 12 }}>
+            <LanguageSheet />
+          </View>
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Gizli profil</Text>
+            <Text style={styles.switchLabel}>{t('profile.privateAccount')}</Text>
             <Switch
               value={isPrivate}
               onValueChange={onTogglePrivate}
@@ -682,10 +687,10 @@ export function ProfileScreen() {
             />
           </View>
           <Text style={styles.switchHint}>
-            Gizli hesapta yalnızca onaylı takipçiler gönderi ve koleksiyonlarınızı görür.
+            {t('profile.privateAccountDesc')}
           </Text>
           <Pressable onPress={() => setSettingsOpen(false)} style={styles.modalClose}>
-            <Text style={styles.modalCloseText}>Kapat</Text>
+            <Text style={styles.modalCloseText}>{t('common.close')}</Text>
           </Pressable>
         </View>
       </Modal>

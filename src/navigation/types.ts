@@ -17,7 +17,7 @@ export type AppStackParamList = {
   Detail: {
     id: string;
     title: string;
-    category: 'music' | 'movie' | 'book' | 'text';
+    category: 'music' | 'movie' | 'book' | 'text' | 'moment';
     description?: string;
     imageUrl?: string;
     body?: string;
@@ -43,6 +43,16 @@ export type AppStackParamList = {
     imageUrl?: string;
   };
   CrudTest: undefined;
+  MapPicker: {
+    initialCoords?: { latitude: number; longitude: number };
+    onConfirm?: (lat: number, lng: number) => void;
+  };
+  CameraLocation: undefined;
+};
+
+export type DrawerParamList = {
+  MainApp: NavigatorScreenParams<AppStackParamList> | undefined;
+  CameraLocation: undefined;
 };
 
 /** Tab + stack ekranları */

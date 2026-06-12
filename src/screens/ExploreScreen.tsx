@@ -19,7 +19,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CachedImage, FilterChip, ScreenSafeArea, SearchBar, StarRating } from '../components';
 import type { PostCategory } from '../components';
-import { NO_SEARCH_IMAGE } from '../constants/searchPlaceholder';
+import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
 import { isFirebaseConfigured } from '../config/firebase';
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
 import { runExploreUnifiedSearch } from '../services/exploreUnifiedSearch';
@@ -228,7 +228,7 @@ export function ExploreScreen() {
                   ) : item.imageUrl?.trim() ? (
                     <CachedImage uri={item.imageUrl} style={styles.thumb} />
                   ) : (
-                    <CachedImage localSource={NO_SEARCH_IMAGE} style={styles.thumb} />
+                    <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.thumb} />
                   )}
                   <View style={styles.resultText}>
                     <Text style={styles.resultTitle} numberOfLines={2}>

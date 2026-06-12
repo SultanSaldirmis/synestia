@@ -73,7 +73,7 @@ export type UserCollectionDoc = {
 /** Kayıtlı içerik satırı (Firestore `items` dizisi öğesi). */
 export type CollectionSavedItemPayload = {
   postId?: string;
-  contentType: 'movie' | 'music' | 'book';
+  contentType: 'movie' | 'music' | 'book' | 'moment';
   title: string;
   imageUrl: string;
   externalUrl?: string;
@@ -106,7 +106,7 @@ export type CollectionItemDoc = {
   id: string;
   title: string;
   imageUrl?: string;
-  contentType?: 'movie' | 'music' | 'book';
+  contentType?: 'movie' | 'music' | 'book' | 'moment';
   externalUrl?: string;
   postId?: string;
   savedAtMs?: number;
@@ -147,7 +147,7 @@ export type CatalogRatingKind = 'book' | 'movie';
 export type CatalogRatingRef = { kind: CatalogRatingKind; id: string };
 
 function isPostCategory(c: unknown): c is PostCategory {
-  return c === 'music' || c === 'movie' || c === 'book' || c === 'text';
+  return c === 'music' || c === 'movie' || c === 'book' || c === 'text' || c === 'moment';
 }
 
 function mapCollectionThemeType(raw: unknown): CollectionThemeType {
@@ -160,7 +160,7 @@ function mapCollectionItemFromStored(raw: unknown): CollectionItemDoc | null {
   const o = raw as Record<string, unknown>;
   const ct = o.contentType;
   const contentType =
-    ct === 'movie' || ct === 'music' || ct === 'book' ? ct : undefined;
+    ct === 'movie' || ct === 'music' || ct === 'book' || ct === 'moment' ? ct : undefined;
   const iu = o.imageUrl;
   return {
     id: String(o.entryId ?? `legacy_${Math.random().toString(36).slice(2)}`),
@@ -502,6 +502,77 @@ export async function createTextPost(
   text: string,
 ): Promise<string> {
   return createFeedPost(uid, profile, text, null);
+}
+
+/** Fotoğraf + konum + metin içeren anı gönderisi oluşturur. */
+export async function createMomentPost(
+  uid: string,
+  profile: { displayName: string; profileImageUrl?: string; isPrivate?: boolean },
+  text: string,
+  imageUrl: string,
+  location?: { latitude: number; longitude: number },
+): Promise<string> {
+  const app = getFirebaseApp();
+  if (!app) throw new Error('Firebase yapılandırılmadı.');
+  const body = text.trim();
+  if (!body && !imageUrl) throw new Error('Metin veya fotoğraf gerekli.');
+  const db = getFirestore(app);
+  const ref = doc(collection(db, 'posts'));
+
+  const payload: Record<string, unknown> = {
+    title: body.slice(0, 80) || 'Anı',
+    excerpt: body,
+    imageUrl,
+    category: 'moment' as PostCategory,
+    authorName: profile.displayName,
+    authorUid: uid,
+    authorProfileImageUrl: profile.profileImageUrl ?? '',
+    authorIsPrivate: profile.isPrivate === true,
+    commentCount: 0,
+    likesCount: 0,
+    createdAt: serverTimestamp(),
+    createdAtClientMs: Date.now(),
+  };
+
+  if (location) {
+    payload.location = { latitude: location.latitude, longitude: location.longitude };
+  }
+
+  await setDoc(ref, sanitizeData(payload as Record<string, unknown>));
+  return ref.id;
+}
+
+/**
+ * Anıyı kullanıcının "Anılar" koleksiyonuna kaydeder.
+ * Koleksiyon yoksa otomatik oluşturur.
+ */
+export async function saveMomentToCollection(
+  uid: string,
+  imageUrl: string,
+  postId?: string,
+): Promise<void> {
+  const app = getFirebaseApp();
+  if (!app) return;
+  const db = getFirestore(app);
+
+  // "Anılar" koleksiyonunu bul veya oluştur
+  const collSnap = await getDocs(
+    query(collection(db, 'users', uid, 'collections'), where('name', '==', 'Anılar')),
+  );
+
+  let collectionId: string;
+  if (collSnap.empty) {
+    collectionId = await createUserCollection(uid, 'Anılar', 'mixed');
+  } else {
+    collectionId = collSnap.docs[0].id;
+  }
+
+  await saveContentToUserCollection(uid, collectionId, {
+    contentType: 'moment',
+    title: `Anı — ${new Date().toLocaleDateString('tr-TR')}`,
+    imageUrl,
+    postId,
+  });
 }
 
 /** Gönderi sahibi: alt koleksiyonları temizleyip gönderiyi siler. */
@@ -887,6 +958,31 @@ export function subscribeUserPosts(
   );
 }
 
+/** Kullanıcının koleksiyonlarını tek seferlik getirir. */
+export async function getUserCollectionsOnce(uid: string): Promise<UserCollectionDoc[]> {
+  const app = getFirebaseApp();
+  if (!app) return [];
+  const db = getFirestore(app);
+  const snap = await getDocs(collection(db, 'users', uid, 'collections'));
+  const rows: { item: UserCollectionDoc; ms: number }[] = [];
+  snap.forEach((d) => {
+    const data = d.data() as Record<string, unknown>;
+    const itemsRaw = data.items;
+    const count = Array.isArray(itemsRaw) ? itemsRaw.length : 0;
+    rows.push({
+      ms: createdAtMillis(data),
+      item: {
+        id: d.id,
+        name: String(data.name ?? 'Koleksiyon'),
+        type: mapCollectionThemeType(data.type),
+        itemsCount: count,
+      },
+    });
+  });
+  rows.sort((a, b) => b.ms - a.ms);
+  return rows.map((r) => r.item);
+}
+
 export function subscribeUserCollections(
   uid: string,
   onNext: (items: UserCollectionDoc[]) => void,
@@ -963,6 +1059,26 @@ export async function saveContentToUserCollection(
   await updateDoc(doc(db, 'users', ownerUid, 'collections', collectionId), {
     items: arrayUnion(safeEntry),
   });
+}
+
+/** Koleksiyon dizisinden tek öğeyi entryId ile siler. */
+export async function removeItemFromCollection(
+  uid: string,
+  collectionId: string,
+  entryId: string,
+): Promise<void> {
+  const app = getFirebaseApp();
+  if (!app) throw new Error('Firebase yapılandırılmadı.');
+  const db = getFirestore(app);
+  const docRef = doc(db, 'users', uid, 'collections', collectionId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return;
+  const data = snap.data() as Record<string, unknown>;
+  const items = Array.isArray(data.items) ? data.items : [];
+  const filtered = (items as Record<string, unknown>[]).filter(
+    (i) => i.entryId !== entryId,
+  );
+  await updateDoc(docRef, { items: filtered });
 }
 
 /** Koleksiyon sahibi: koleksiyon belgesini siler (öğeler `items` dizisindedir). */

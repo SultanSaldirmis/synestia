@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   ActivityIndicator,
   ImageBackground,
@@ -11,43 +10,45 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { showMessage } from 'react-native-flash-message';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../context/AuthContext';
 import type { AuthStackParamList } from '../navigation/types';
 import { colors, radii, spacing, spacingVertical, typography } from '../theme';
+import { registerSchema, type RegisterFormValues } from '../validation/authSchemas';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 const BG = require('../assets/synestia_background.png');
 
 export function RegisterScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { signUp, firebaseConfigured } = useAuth();
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit() {
-    setError(null);
+  const {
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormValues>({
+    resolver: yupResolver(registerSchema),
+    defaultValues: { displayName: '', email: '', password: '', passwordConfirm: '' },
+  });
+
+  async function onSubmit(data: RegisterFormValues) {
     if (!firebaseConfigured) {
-      setError('Önce Firebase .env değişkenlerini doldurun.');
+      showMessage({ message: 'Önce Firebase yapılandırmasını tamamlayın.', type: 'warning' });
       return;
     }
-    if (!email.trim() || password.length < 6) {
-      setError('Geçerli e-posta ve en az 6 karakter şifre gerekli.');
-      return;
-    }
-    setBusy(true);
     try {
-      await signUp(email, password, displayName);
+      await signUp(data.email, data.password, data.displayName);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Kayıt başarısız.';
-      setError(msg);
-    } finally {
-      setBusy(false);
+      showMessage({ message: msg, type: 'danger' });
     }
   }
 
@@ -64,61 +65,101 @@ export function RegisterScreen({ navigation }: Props) {
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.title}>Hesap oluştur</Text>
-            <Text style={styles.subtitle}>
-              Synestia topluluğuna katılmak için bilgilerini doldur.
-            </Text>
+            <Text style={styles.title}>{t('auth.createAccount')}</Text>
+            <Text style={styles.subtitle}>{t('auth.joinCommunity')}</Text>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <Text style={styles.label}>Görünen ad</Text>
-            <TextInput
-              value={displayName}
-              onChangeText={setDisplayName}
-              style={styles.input}
-              placeholder="Ad Soyad"
-              placeholderTextColor={colors.textMuted}
+            <Text style={styles.label}>{t('auth.displayName')}</Text>
+            <Controller
+              control={control}
+              name="displayName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  style={[styles.input, errors.displayName && styles.inputError]}
+                  placeholder={t('auth.namePlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                />
+              )}
             />
+            {errors.displayName && <Text style={styles.fieldError}>{errors.displayName.message}</Text>}
 
-            <Text style={styles.label}>E-posta</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-              placeholder="ornek@edu.tr"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
+            <Text style={styles.label}>{t('auth.email')}</Text>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  style={[styles.input, errors.email && styles.inputError]}
+                  placeholder={t('auth.emailPlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              )}
             />
+            {errors.email && <Text style={styles.fieldError}>{errors.email.message}</Text>}
 
-            <Text style={styles.label}>Şifre</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-              placeholder="En az 6 karakter"
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
+            <Text style={styles.label}>{t('auth.password')}</Text>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  style={[styles.input, errors.password && styles.inputError]}
+                  placeholder={t('auth.passwordPlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry
+                />
+              )}
             />
+            {errors.password && <Text style={styles.fieldError}>{errors.password.message}</Text>}
+
+            <Text style={styles.label}>Şifre Tekrar</Text>
+            <Controller
+              control={control}
+              name="passwordConfirm"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  style={[styles.input, errors.passwordConfirm && styles.inputError]}
+                  placeholder="Şifreyi tekrar giriniz"
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry
+                />
+              )}
+            />
+            {errors.passwordConfirm && (
+              <Text style={styles.fieldError}>{errors.passwordConfirm.message}</Text>
+            )}
 
             <Pressable
-              onPress={onSubmit}
-              disabled={busy}
+              onPress={() => void handleSubmit(onSubmit)()}
+              disabled={isSubmitting}
               style={({ pressed }) => [
                 styles.primaryBtn,
-                (pressed || busy) && styles.primaryBtnDim,
+                (pressed || isSubmitting) && styles.primaryBtnDim,
               ]}
             >
-              {busy ? (
+              {isSubmitting ? (
                 <ActivityIndicator color={colors.textOnAccent} />
               ) : (
-                <Text style={styles.primaryBtnText}>Kayıt ol</Text>
+                <Text style={styles.primaryBtnText}>{t('auth.register')}</Text>
               )}
             </Pressable>
 
             <Pressable onPress={() => navigation.goBack()} style={styles.secondary}>
-              <Text style={styles.secondaryText}>Girişe dön</Text>
+              <Text style={styles.secondaryText}>{t('auth.hasAccount')}</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -149,11 +190,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacingVertical.lg,
   },
-  error: {
-    ...typography.meta,
-    color: colors.danger,
-    marginBottom: spacingVertical.md,
-  },
   label: {
     ...typography.caption,
     color: colors.textMuted,
@@ -169,7 +205,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacingVertical.sm,
-    marginBottom: spacingVertical.md,
+    marginBottom: 2,
+  },
+  inputError: { borderColor: colors.danger },
+  fieldError: {
+    ...typography.meta,
+    color: colors.danger,
+    marginBottom: spacingVertical.sm,
   },
   primaryBtn: {
     backgroundColor: colors.accentGreen,

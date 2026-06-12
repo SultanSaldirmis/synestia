@@ -1,28 +1,55 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 1. Kullanıcı Profilleri (users koleksiyonu)
-    match /users/{userId} {
-      // Herkes giriş yapmış olmak kaydıyla profilleri görebilir (Okuma izni)
+
+    // Kullanıcı profili ve TÜM alt koleksiyonlar
+    // (likes, collections, notifications, following, followers)
+    // Yalnızca kendi verisine okuma/yazma izni
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Postlar — okuma tüm giriş yapmış kullanıcılara,
+    // oluşturma kendi uid'siyle, güncelleme/silme yalnızca yazara
+    match /posts/{postId} {
       allow read: if request.auth != null;
-      
-      // Sadece profilin sahibi kendi bilgilerini değiştirebilir (Yazma/Güncelleme izni)
-      allow write: if request.auth != null && request.auth.uid == userId;
-      
-      // Kullanıcının kendi altındaki "likes" koleksiyonu için izinler
-      match /likes/{likeId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.authorUid;
+      allow update, delete: if request.auth != null
+                             && request.auth.uid == resource.data.authorUid;
+
+      // Post beğenileri — herkes kendi uid yoluyla yazar
+      match /likes/{uid} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Post yorumları — okuma/ekleme herkese açık,
+      // silme yalnızca yorum sahibine
+      match /comments/{commentId} {
+        allow read, create: if request.auth != null;
+        allow delete: if request.auth != null
+                      && request.auth.uid == resource.data.authorUid;
       }
     }
 
-    // 2. Genel İçerikler (Kitap, Film, Müzik vb. eğer ayrı bir koleksiyondaysa)
-    // Eğer tüm içeriklerin okunmasını istiyorsan:
-    match /{document=**} {
+    // Katalog kitap puanlamaları
+    match /bookRatings/{itemId} {
       allow read: if request.auth != null;
-      // Admin paneli yapmayacağımız için genel yazma iznini kısıtlıyoruz
-      allow write: if request.auth != null; 
+      allow write: if request.auth != null;
+    }
+
+    // Katalog film puanlamaları
+    match /movieRatings/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Genel katalog yorumları
+    match /globalContentComments/{itemId}/comments/{commentId} {
+      allow read, create: if request.auth != null;
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.authorId;
     }
   }
 }

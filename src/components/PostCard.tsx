@@ -14,7 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NO_SEARCH_IMAGE } from '../constants/searchPlaceholder';
+import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
 import type { AttachedContent } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -32,7 +32,7 @@ import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography
 import { CachedImage } from './CachedImage';
 import { StarRating } from './StarRating';
 
-export type PostCategory = 'music' | 'movie' | 'book' | 'text';
+export type PostCategory = 'music' | 'movie' | 'book' | 'text' | 'moment';
 
 export type PostCardProps = {
   title: string;
@@ -77,6 +77,7 @@ const categoryLabel: Record<PostCategory, string> = {
   movie: 'Film',
   book: 'Kitap',
   text: 'Gönderi',
+  moment: 'Anı',
 };
 
 const attachedTypeLabel: Record<AttachedContent['type'], string> = {
@@ -196,7 +197,8 @@ export function PostCard({
       setSaveBusy(false);
     }
   };
-  const isTextPost = !hasAttached && (category === 'text' || !imageUrl?.trim());
+  // moment gönderileri imageUrl gösterir; text kategorisi imageUrl yoksa saf metin postu sayılır
+  const isTextPost = !hasAttached && (category === 'text' || category === undefined) && !imageUrl?.trim();
   const showCommentBox = Boolean(onSubmitComment && onChangeCommentDraft !== undefined && commentDraft !== undefined);
   const avatarUri = profileImageDisplayUri(authorAvatarStored);
   const displayName = (authorName ?? 'Kullanıcı').replace(/^@/, '').trim() || 'Kullanıcı';
@@ -301,7 +303,7 @@ export function PostCard({
           {attachedContent.imageUrl?.trim() ? (
             <CachedImage uri={attachedContent.imageUrl} style={styles.attachedThumb} />
           ) : (
-            <CachedImage localSource={NO_SEARCH_IMAGE} style={styles.attachedThumb} />
+            <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.attachedThumb} />
           )}
           <View style={styles.attachedTextCol}>
             <Text style={styles.attachedType}>{attachedTypeLabel[attachedContent.type]}</Text>

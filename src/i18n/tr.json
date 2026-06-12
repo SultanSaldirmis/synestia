@@ -1,0 +1,124 @@
+{
+  "common": {
+    "appName": "Synestia",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "confirm": "Onayla",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "loading": "Yükleniyor...",
+    "error": "Hata",
+    "success": "Başarılı",
+    "retry": "Tekrar dene",
+    "close": "Kapat",
+    "back": "Geri",
+    "yes": "Evet",
+    "no": "Hayır"
+  },
+  "auth": {
+    "login": "Giriş Yap",
+    "register": "Kayıt Ol",
+    "logout": "Çıkış Yap",
+    "email": "E-posta",
+    "password": "Şifre",
+    "displayName": "Görünen Ad",
+    "emailPlaceholder": "ornek@edu.tr",
+    "passwordPlaceholder": "En az 6 karakter",
+    "namePlaceholder": "Ad Soyad",
+    "tagline": "Müzik · Film · Kitap — tek sosyal akış",
+    "noAccount": "Hesabın yok mu? Kayıt ol",
+    "hasAccount": "Girişe dön",
+    "forgotPassword": "Şifremi Unuttum",
+    "createAccount": "Hesap oluştur",
+    "joinCommunity": "Synestia topluluğuna katılmak için bilgilerini doldur.",
+    "loggingIn": "Giriş Yapılıyor...",
+    "registering": "Kaydediliyor...",
+    "resetSent": "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.",
+    "resetEmailRequired": "Önce e-posta alanını doldurun.",
+    "serverUnavailable": "Servise şu anda bağlanılamıyor. Lütfen daha sonra tekrar deneyin."
+  },
+  "validation": {
+    "emailRequired": "E-posta adresi zorunludur",
+    "emailInvalid": "Geçerli bir e-posta adresi giriniz",
+    "passwordRequired": "Şifre zorunludur",
+    "passwordMin": "Şifre en az 6 karakter olmalıdır",
+    "nameRequired": "Ad soyad zorunludur",
+    "nameMin": "Ad en az 2 karakter olmalıdır",
+    "passwordConfirmRequired": "Şifre onayı zorunludur",
+    "passwordMismatch": "Şifreler eşleşmiyor"
+  },
+  "tabs": {
+    "feed": "Akış",
+    "explore": "Keşfet",
+    "profile": "Profil",
+    "notifications": "Bildirimler"
+  },
+  "home": {
+    "title": "Akış",
+    "noContent": "Henüz içerik yok",
+    "createFirst": "İlk gönderini oluştur"
+  },
+  "explore": {
+    "title": "Keşfet",
+    "searchPlaceholder": "Müzik, film, kitap veya kullanıcı ara...",
+    "all": "Tümü",
+    "music": "Müzik",
+    "film": "Film",
+    "book": "Kitap",
+    "user": "Kullanıcı",
+    "noResults": "Sonuç bulunamadı"
+  },
+  "profile": {
+    "title": "Profil",
+    "editProfile": "Profili Düzenle",
+    "posts": "Gönderiler",
+    "collections": "Koleksiyonlar",
+    "followers": "Takipçiler",
+    "following": "Takip Edilenler",
+    "settings": "Ayarlar",
+    "privateAccount": "Gizli hesap",
+    "privateAccountDesc": "Gizli hesapta yalnızca onaylı takipçiler gönderilerini ve koleksiyonlarını görür.",
+    "createCollection": "Koleksiyon oluştur",
+    "noPost": "Henüz gönderi yok"
+  },
+  "notifications": {
+    "title": "Bildirimler",
+    "markAllRead": "Tümünü okundu say",
+    "noNotifications": "Henüz bildirim yok",
+    "followRequest": "seni takip etmek istiyor",
+    "newFollower": "seni takip etmeye başladı",
+    "likedPost": "gönderini beğendi",
+    "commentedPost": "gönderine yorum yaptı",
+    "accept": "Kabul",
+    "reject": "Reddet"
+  },
+  "settings": {
+    "language": "Dil",
+    "selectLanguage": "Dil Seçin",
+    "turkish": "Türkçe",
+    "english": "İngilizce"
+  },
+  "drawer": {
+    "mainApp": "Ana Uygulama",
+    "momentCapture": "Anı Kaydet"
+  },
+  "camera": {
+    "title": "Anı Kaydet",
+    "takePhoto": "Yeni Fotoğraf Çek",
+    "updatePhoto": "Fotoğrafı Güncelle",
+    "photoSaved": "Fotoğraf kaydedildi",
+    "manualLocation": "Manuel Konum Seç",
+    "gpsLocation": "GPS Konumunu Al",
+    "locationSaved": "Konum kaydedildi",
+    "locationPreview": "Konum Önizleme",
+    "gpsLoading": "Konum alınıyor...",
+    "saved": "Anı başarıyla kaydedildi!",
+    "permissionDenied": "Kamera izni verilmedi",
+    "locationPermissionDenied": "Konum izni verilmedi"
+  },
+  "map": {
+    "title": "Konum Seç",
+    "confirm": "Konumu Onayla",
+    "hint": "Konumunuzu seçmek için haritaya dokunun"
+  }
+}

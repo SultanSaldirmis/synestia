@@ -17,7 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { CachedImage, StarRating } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { NO_SEARCH_IMAGE } from '../constants/searchPlaceholder';
+import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
 import type { AttachedContent } from '../data/mockData';
 import type { AppStackParamList } from '../navigation/types';
 import {
@@ -299,7 +299,7 @@ export function CreatePostScreen({ navigation }: Props) {
                 {item.imageUrl?.trim() ? (
                   <CachedImage uri={item.imageUrl} style={styles.resultThumb} />
                 ) : (
-                  <CachedImage localSource={NO_SEARCH_IMAGE} style={styles.resultThumb} />
+                  <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.resultThumb} />
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultTitle} numberOfLines={2}>
@@ -322,7 +322,7 @@ export function CreatePostScreen({ navigation }: Props) {
             {attachedPreview.imageUrl?.trim() ? (
               <CachedImage uri={attachedPreview.imageUrl} style={styles.selectedThumb} />
             ) : (
-              <CachedImage localSource={NO_SEARCH_IMAGE} style={styles.selectedThumb} />
+              <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.selectedThumb} />
             )}
             <View style={{ flex: 1 }}>
               <Text style={styles.selectedMeta}>Seçilen içerik</Text>

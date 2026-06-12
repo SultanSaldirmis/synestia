@@ -2,7 +2,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { colors, spacingVertical } from '../theme';
-import { AppNavigator } from './AppNavigator';
+import { DrawerNavigator } from './DrawerNavigator';
 import { AuthNavigator } from './AuthNavigator';
 
 export function RootNavigator() {
@@ -16,7 +16,7 @@ export function RootNavigator() {
     );
   }
 
-  return user ? <AppNavigator /> : <AuthNavigator />;
+  return user ? <DrawerNavigator /> : <AuthNavigator />;
 }
 
 const styles = StyleSheet.create({
