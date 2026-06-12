@@ -14,11 +14,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
 import type { AttachedContent } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import {
-  COLLECTION_TYPE_LABEL,
   createUserCollection,
   saveContentToUserCollection,
   subscribeUserCollections,
@@ -26,6 +26,7 @@ import {
   type CollectionThemeType,
   type UserCollectionDoc,
 } from '../services/firestoreService';
+import { getCollectionTypeLabel } from '../utils/collectionLabels';
 import { defaultHandleFromName } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
@@ -72,20 +73,6 @@ export type PostCardProps = {
   postRating?: number;
 };
 
-const categoryLabel: Record<PostCategory, string> = {
-  music: 'Müzik',
-  movie: 'Film',
-  book: 'Kitap',
-  text: 'Gönderi',
-  moment: 'Anı',
-};
-
-const attachedTypeLabel: Record<AttachedContent['type'], string> = {
-  song: 'Müzik',
-  movie: 'Film',
-  book: 'Kitap',
-};
-
 const NEW_COLL_TYPES: CollectionThemeType[] = ['film', 'music', 'book', 'mixed'];
 
 const AVATAR = scale(44);
@@ -127,6 +114,7 @@ export function PostCard({
   totalRatings,
   postRating,
 }: PostCardProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [imageError, setImageError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -162,13 +150,13 @@ export function PostCard({
     try {
       await saveContentToUserCollection(user.uid, collId, bookmarkPayload);
       if (Platform.OS === 'android') {
-        ToastAndroid.show('Başarıyla eklendi', ToastAndroid.SHORT);
+        ToastAndroid.show(t('collection.addedToast'), ToastAndroid.SHORT);
       } else {
-        Alert.alert('Kaydedildi', 'İçerik koleksiyona eklendi.');
+        Alert.alert(t('collection.saved'));
       }
       closeSaveModal();
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Kaydedilemedi.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('collection.saveFailed'));
     } finally {
       setSaveBusy(false);
     }
@@ -178,7 +166,7 @@ export function PostCard({
     if (!user?.uid || !bookmarkPayload) return;
     const n = newCollName.trim();
     if (!n) {
-      Alert.alert('İsim', 'Koleksiyon adı girin.');
+      Alert.alert(t('camera.nameRequired'), t('collection.nameRequired'));
       return;
     }
     setSaveBusy(true);
@@ -186,13 +174,13 @@ export function PostCard({
       const id = await createUserCollection(user.uid, n, newCollType);
       await saveContentToUserCollection(user.uid, id, bookmarkPayload);
       if (Platform.OS === 'android') {
-        ToastAndroid.show('Başarıyla eklendi', ToastAndroid.SHORT);
+        ToastAndroid.show(t('collection.addedToast'), ToastAndroid.SHORT);
       } else {
-        Alert.alert('Kaydedildi', 'Yeni koleksiyon oluşturuldu ve içerik eklendi.');
+        Alert.alert(t('collection.savedNew'));
       }
       closeSaveModal();
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Oluşturulamadı.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('collection.createFailed'));
     } finally {
       setSaveBusy(false);
     }
@@ -201,7 +189,7 @@ export function PostCard({
   const isTextPost = !hasAttached && (category === 'text' || category === undefined) && !imageUrl?.trim();
   const showCommentBox = Boolean(onSubmitComment && onChangeCommentDraft !== undefined && commentDraft !== undefined);
   const avatarUri = profileImageDisplayUri(authorAvatarStored);
-  const displayName = (authorName ?? 'Kullanıcı').replace(/^@/, '').trim() || 'Kullanıcı';
+  const displayName = (authorName ?? t('common.defaultUser')).replace(/^@/, '').trim() || t('common.defaultUser');
   const handle = authorHandle ?? defaultHandleFromName(authorName);
   const bodyText = excerpt?.trim() || title;
   const effectiveRating = typeof postRating === 'number' ? postRating : averageRating;
@@ -234,7 +222,7 @@ export function PostCard({
             </View>
           ) : null}
           {hasMenu ? (
-            <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} style={styles.dotsHit} accessibilityLabel="Seçenekler">
+            <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} style={styles.dotsHit} accessibilityLabel={t('common.options')}>
               <Ionicons name="ellipsis-vertical" size={scale(18)} color={colors.textMuted} />
             </Pressable>
           ) : null}
@@ -243,7 +231,7 @@ export function PostCard({
 
       {category ? (
         <View style={styles.inlineBadge}>
-          <Text style={styles.inlineBadgeText}>{categoryLabel[category]}</Text>
+          <Text style={styles.inlineBadgeText}>{t(`post.category.${category}`)}</Text>
         </View>
       ) : null}
       {category === 'book' || category === 'movie' || attachedContent?.type === 'book' || attachedContent?.type === 'movie' ? (
@@ -251,7 +239,7 @@ export function PostCard({
           {typeof effectiveRating === 'number' ? (
             <StarRating rating={effectiveRating} totalRatings={totalRatings} size={scale(13)} />
           ) : (
-            <Text style={styles.unratedText}>Henüz puanlanmadı</Text>
+            <Text style={styles.unratedText}>{t('rating.notRatedYet')}</Text>
           )}
         </View>
       ) : null}
@@ -306,7 +294,13 @@ export function PostCard({
             <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.attachedThumb} />
           )}
           <View style={styles.attachedTextCol}>
-            <Text style={styles.attachedType}>{attachedTypeLabel[attachedContent.type]}</Text>
+            <Text style={styles.attachedType}>
+              {attachedContent.type === 'song'
+                ? t('post.category.music')
+                : attachedContent.type === 'movie'
+                  ? t('post.category.movie')
+                  : t('post.category.book')}
+            </Text>
             <Text style={styles.attachedTitle} numberOfLines={2}>
               {attachedContent.title}
             </Text>
@@ -320,13 +314,13 @@ export function PostCard({
           disabled={!openComments}
           hitSlop={8}
           style={styles.actionHit}
-          accessibilityLabel="Yorumlar"
+          accessibilityLabel={t('post.commentCount', { count: commentCount })}
         >
           <Ionicons name="chatbubble-outline" size={scale(20)} color={iconMuted} />
           <Text style={styles.actionCount}>{commentCount}</Text>
         </Pressable>
         {showLike ? (
-          <Pressable onPress={onToggleLike} hitSlop={8} style={styles.actionHit} accessibilityLabel={liked ? 'Beğeniyi kaldır' : 'Beğen'}>
+          <Pressable onPress={onToggleLike} hitSlop={8} style={styles.actionHit} accessibilityLabel={liked ? t('post.unlike') : t('post.like')}>
             <Ionicons name={liked ? 'heart' : 'heart-outline'} size={scale(20)} color={liked ? colors.profileAccent : iconMuted} />
             <Text style={styles.actionCount}>{likesCount}</Text>
           </Pressable>
@@ -337,7 +331,7 @@ export function PostCard({
           </View>
         )}
         {onShare ? (
-          <Pressable onPress={onShare} hitSlop={8} style={styles.actionHit} accessibilityLabel="Paylaş">
+          <Pressable onPress={onShare} hitSlop={8} style={styles.actionHit} accessibilityLabel={t('post.share')}>
             <Ionicons name="share-outline" size={scale(20)} color={iconMuted} />
           </Pressable>
         ) : null}
@@ -346,7 +340,7 @@ export function PostCard({
             onPress={() => setSaveOpen(true)}
             hitSlop={8}
             style={styles.actionHit}
-            accessibilityLabel="Koleksiyona kaydet"
+            accessibilityLabel={t('collection.save')}
           >
             <Ionicons name="bookmark-outline" size={scale(20)} color={iconMuted} />
           </Pressable>
@@ -357,7 +351,7 @@ export function PostCard({
         <View style={styles.commentRow}>
           <TextInput
             style={styles.commentInput}
-            placeholder="Yorum yaz…"
+            placeholder={t('post.commentPlaceholder')}
             placeholderTextColor={colors.textMuted}
             value={commentDraft}
             onChangeText={onChangeCommentDraft}
@@ -391,7 +385,7 @@ export function PostCard({
               }}
             >
               <Ionicons name="create-outline" size={scale(20)} color={colors.accentPurple} />
-              <Text style={styles.menuItemText}>Düzenle</Text>
+              <Text style={styles.menuItemText}>{t('common.edit')}</Text>
             </Pressable>
           ) : null}
           {showOwnerDelete && onDeletePost ? (
@@ -403,7 +397,7 @@ export function PostCard({
               }}
             >
               <Ionicons name="trash-outline" size={scale(20)} color={colors.danger} />
-              <Text style={[styles.menuItemText, { color: colors.danger }]}>Sil</Text>
+              <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('common.delete')}</Text>
             </Pressable>
           ) : null}
           {!showOwnerDelete && onReportPost ? (
@@ -415,11 +409,11 @@ export function PostCard({
               }}
             >
               <Ionicons name="flag-outline" size={scale(20)} color={colors.danger} />
-              <Text style={[styles.menuItemText, { color: colors.danger }]}>Raporla</Text>
+              <Text style={[styles.menuItemText, { color: colors.danger }]}>{t('post.report')}</Text>
             </Pressable>
           ) : null}
           <Pressable style={styles.menuCancel} onPress={() => setMenuOpen(false)}>
-            <Text style={styles.menuCancelText}>İptal</Text>
+            <Text style={styles.menuCancelText}>{t('common.cancel')}</Text>
           </Pressable>
         </View>
       </Modal>
@@ -427,7 +421,7 @@ export function PostCard({
       <Modal visible={saveOpen} transparent animationType="slide" onRequestClose={closeSaveModal}>
         <Pressable style={styles.menuBackdrop} onPress={closeSaveModal} />
         <View style={styles.saveSheet}>
-          <Text style={styles.saveTitle}>Koleksiyona kaydet</Text>
+          <Text style={styles.saveTitle}>{t('collection.saveTitle')}</Text>
           {saveView === 'pick' ? (
             <>
               <ScrollView style={styles.saveScroll} keyboardShouldPersistTaps="handled">
@@ -437,10 +431,10 @@ export function PostCard({
                   disabled={saveBusy}
                 >
                   <Ionicons name="add-circle-outline" size={scale(22)} color={colors.accentPurple} />
-                  <Text style={styles.saveNewText}>Yeni koleksiyon oluştur</Text>
+                  <Text style={styles.saveNewText}>{t('profile.createCollection')}</Text>
                 </Pressable>
                 {collections.length === 0 ? (
-                  <Text style={styles.saveEmpty}>Henüz koleksiyon yok. Yukarıdan oluşturun.</Text>
+                  <Text style={styles.saveEmpty}>{t('profile.noCollectionsHint')}</Text>
                 ) : (
                   collections.map((c) => (
                     <Pressable
@@ -455,7 +449,7 @@ export function PostCard({
                           {c.name}
                         </Text>
                         <Text style={styles.saveRowMeta} numberOfLines={1}>
-                          {COLLECTION_TYPE_LABEL[c.type]} · {c.itemsCount} öğe
+                          {getCollectionTypeLabel(t, c.type)} · {t('collection.itemCount', { count: c.itemsCount })}
                         </Text>
                       </View>
                     </Pressable>
@@ -467,22 +461,22 @@ export function PostCard({
             <>
               <TextInput
                 style={styles.saveInput}
-                placeholder="Koleksiyon adı"
+                placeholder={t('collection.namePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={newCollName}
                 onChangeText={setNewCollName}
               />
               <View style={styles.typeChips}>
-                {NEW_COLL_TYPES.map((t) => {
-                  const active = newCollType === t;
+                {NEW_COLL_TYPES.map((collType) => {
+                  const active = newCollType === collType;
                   return (
                     <Pressable
-                      key={t}
-                      onPress={() => setNewCollType(t)}
+                      key={collType}
+                      onPress={() => setNewCollType(collType)}
                       style={[styles.typeChip, active && styles.typeChipActive]}
                     >
                       <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                        {COLLECTION_TYPE_LABEL[t]}
+                        {getCollectionTypeLabel(t, collType)}
                       </Text>
                     </Pressable>
                   );
@@ -496,16 +490,16 @@ export function PostCard({
                 {saveBusy ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.savePrimaryText}>Oluştur ve kaydet</Text>
+                  <Text style={styles.savePrimaryText}>{t('collection.createAndSave')}</Text>
                 )}
               </Pressable>
               <Pressable onPress={() => setSaveView('pick')} style={styles.menuCancel} disabled={saveBusy}>
-                <Text style={styles.menuCancelText}>Geri</Text>
+                <Text style={styles.menuCancelText}>{t('common.back')}</Text>
               </Pressable>
             </>
           )}
           <Pressable onPress={closeSaveModal} style={styles.menuCancel} disabled={saveBusy}>
-            <Text style={styles.menuCancelText}>Kapat</Text>
+            <Text style={styles.menuCancelText}>{t('common.close')}</Text>
           </Pressable>
         </View>
       </Modal>

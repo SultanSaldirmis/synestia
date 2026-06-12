@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -50,16 +51,17 @@ const cardShadow = Platform.select({
 
 const tabSafeEdges = ['top', 'left', 'right', 'bottom'] as const;
 
-const TYPE_LABEL: Record<SearchResult['type'], string> = {
-  movie: 'Film',
-  music: 'Müzik',
-  book: 'Kitap',
-  user: 'Kullanıcı',
-};
-
 export function ExploreScreen() {
   const navigation = useNavigation<ExploreNav>();
+  const { t } = useTranslation();
   const { user } = useAuth();
+
+  const typeLabel = (type: SearchResult['type']) => {
+    if (type === 'user') return t('explore.user');
+    if (type === 'music') return t('explore.music');
+    if (type === 'movie') return t('explore.film');
+    return t('explore.book');
+  };
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -182,7 +184,7 @@ export function ExploreScreen() {
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          placeholder="Kullanıcı, kitap, film veya müzik ara..."
+          placeholder={t('explore.searchPlaceholder')}
           onSubmitEditing={onSubmit}
         />
 
@@ -193,11 +195,11 @@ export function ExploreScreen() {
             contentContainerStyle={styles.chipsRow}
             style={styles.chipsScroll}
           >
-            <FilterChip label="Tümü" selected={filter === 'all'} onPress={() => setFilter('all')} />
-            <FilterChip label="Kullanıcı" selected={filter === 'user'} onPress={() => setFilter('user')} />
-            <FilterChip label="Müzik" selected={filter === 'music'} onPress={() => setFilter('music')} />
-            <FilterChip label="Film" selected={filter === 'movie'} onPress={() => setFilter('movie')} />
-            <FilterChip label="Kitap" selected={filter === 'book'} onPress={() => setFilter('book')} />
+            <FilterChip label={t('explore.all')} selected={filter === 'all'} onPress={() => setFilter('all')} />
+            <FilterChip label={t('explore.user')} selected={filter === 'user'} onPress={() => setFilter('user')} />
+            <FilterChip label={t('explore.music')} selected={filter === 'music'} onPress={() => setFilter('music')} />
+            <FilterChip label={t('explore.film')} selected={filter === 'movie'} onPress={() => setFilter('movie')} />
+            <FilterChip label={t('explore.book')} selected={filter === 'book'} onPress={() => setFilter('book')} />
           </ScrollView>
         )}
 
@@ -207,7 +209,7 @@ export function ExploreScreen() {
 
         {filtered.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Sonuçlar ({filtered.length})</Text>
+            <Text style={styles.sectionLabel}>{t('explore.resultsCount', { count: filtered.length })}</Text>
             {filtered.map((item) => {
               const isUser = item.type === 'user';
               const userUri = isUser ? profileImageDisplayUri(item.profileImageStored) : undefined;
@@ -234,12 +236,12 @@ export function ExploreScreen() {
                     <Text style={styles.resultTitle} numberOfLines={2}>
                       {item.title}
                     </Text>
-                    <Text style={styles.resultMeta}>{TYPE_LABEL[item.type]}</Text>
+                    <Text style={styles.resultMeta}>{typeLabel(item.type)}</Text>
                     {item.type === 'book' || item.type === 'movie' ? (
                       typeof item.averageRating === 'number' ? (
                         <StarRating rating={item.averageRating} totalRatings={item.totalRatings ?? 0} size={scale(12)} />
                       ) : (
-                        <Text style={styles.unrated}>Henüz puanlanmadı</Text>
+                        <Text style={styles.unrated}>{t('rating.notRatedYet')}</Text>
                       )
                     ) : null}
                     <Text style={styles.resultDesc} numberOfLines={2}>
@@ -253,15 +255,13 @@ export function ExploreScreen() {
         )}
 
         {hasSearched && !searching && filtered.length === 0 && (
-          <Text style={styles.empty}>Sonuç bulunamadı.</Text>
+          <Text style={styles.empty}>{t('explore.noResults')}</Text>
         )}
 
         {!hasSearched && !searching && (
           <View style={styles.initialState}>
             <Text style={styles.initialIcon}>🔍</Text>
-            <Text style={styles.initialText}>
-              Kullanıcı, film, kitap veya müzik aramak için yukarıya yazın.
-            </Text>
+            <Text style={styles.initialText}>{t('explore.searchHint')}</Text>
           </View>
         )}
       </ScrollView>

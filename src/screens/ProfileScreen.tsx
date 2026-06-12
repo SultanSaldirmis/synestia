@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,26 +27,21 @@ import { useAuth } from '../context/AuthContext';
 import { MOCK_USER } from '../data/mockData';
 import type { FeedPost } from '../data/mockData';
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { useProfileScreenModel } from '../hooks/useProfileScreenModel';
 import {
   addPostComment,
-  COLLECTION_TYPE_LABEL,
   createUserCollection,
   deletePost,
   deleteUserCollection,
-  subscribeUserCollections,
-  subscribeUserLikes,
-  subscribeUserPosts,
-  subscribeUserProfile,
   togglePostLike,
   updateUserProfileData,
-  getCatalogRatingsByRefs,
   type CollectionThemeType,
   type UserCollectionDoc,
   type UserLikeDoc,
-  type UserProfileDoc,
 } from '../services/firestoreService';
 import { buildBookmarkPayloadFromPost } from '../utils/buildBookmarkPayload';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { getCollectionTypeLabel } from '../utils/collectionLabels';
+import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
 
@@ -66,98 +61,37 @@ const PROFILE_CARD_RADIUS = 25;
 
 type ContentTab = 'posts' | 'likes' | 'likedCollection';
 
-const TABS: { key: ContentTab; label: string }[] = [
-  { key: 'posts', label: 'Gönderiler' },
-  { key: 'likes', label: 'Beğenilenler' },
-  { key: 'likedCollection', label: 'Koleksiyonlar' },
-];
-
 export function ProfileScreen() {
   const navigation = useNavigation<ProfileNav>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, signOut, firebaseConfigured } = useAuth();
-  const [profile, setProfile] = useState<UserProfileDoc | null>(null);
+  const {
+    profile,
+    orderedUserPosts,
+    likes,
+    collections,
+    contentRatings,
+    nowMs,
+  } = useProfileScreenModel(user?.uid, firebaseConfigured);
   const [contentTab, setContentTab] = useState<ContentTab>('posts');
-  const [likes, setLikes] = useState<UserLikeDoc[]>([]);
-  const [collections, setCollections] = useState<UserCollectionDoc[]>([]);
-  const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newCollOpen, setNewCollOpen] = useState(false);
   const [newCollName, setNewCollName] = useState('');
   const [newCollType, setNewCollType] = useState<CollectionThemeType>('mixed');
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [contentRatings, setContentRatings] = useState<Record<string, { averageRating: number; totalRatings: number }>>({});
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [collSaving, setCollSaving] = useState(false);
   const collSavingRef = useRef(false);
   const { playTrack } = useMusicPlayer();
-  const orderedUserPosts = useMemo(
-    () =>
-      userPosts
-        .slice()
-        .sort(
-          (a, b) =>
-            (b.createdAtMs ?? b.createdAtClientMs ?? 0) - (a.createdAtMs ?? a.createdAtClientMs ?? 0),
-        ),
-    [userPosts],
+
+  const tabs = useMemo(
+    (): { key: ContentTab; label: string }[] => [
+      { key: 'posts', label: t('profile.posts') },
+      { key: 'likes', label: t('profile.liked') },
+      { key: 'likedCollection', label: t('profile.collections') },
+    ],
+    [t],
   );
-
-  useEffect(() => {
-    if (!user?.uid || !firebaseConfigured) {
-      setProfile(null);
-      return;
-    }
-    return subscribeUserProfile(user.uid, setProfile);
-  }, [user?.uid, firebaseConfigured]);
-
-  useEffect(() => {
-    const refs = orderedUserPosts
-      .map((p) => {
-        if (p.attachedContent?.type === 'book') return { kind: 'book' as const, id: p.attachedContent.id };
-        if (p.attachedContent?.type === 'movie') {
-          return { kind: 'movie' as const, id: p.attachedContent.id.replace(/^tmdb_/, '') };
-        }
-        if (p.category === 'book') return { kind: 'book' as const, id: p.id };
-        if (p.category === 'movie') return { kind: 'movie' as const, id: p.id.replace(/^tmdb_/, '') };
-        return null;
-      })
-      .filter((x): x is { kind: 'book' | 'movie'; id: string } => Boolean(x?.id));
-    if (refs.length === 0) {
-      setContentRatings({});
-      return;
-    }
-    void getCatalogRatingsByRefs(refs).then(setContentRatings).catch(() => {});
-  }, [orderedUserPosts]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!user?.uid || !firebaseConfigured) {
-      setLikes([]);
-      return;
-    }
-    return subscribeUserLikes(user.uid, setLikes);
-  }, [user?.uid, firebaseConfigured]);
-
-  useEffect(() => {
-    if (!user?.uid || !firebaseConfigured) {
-      setCollections([]);
-      return;
-    }
-    return subscribeUserCollections(user.uid, setCollections);
-  }, [user?.uid, firebaseConfigured]);
-
-  useEffect(() => {
-    if (!user?.uid || !firebaseConfigured) {
-      setUserPosts([]);
-      return;
-    }
-    return subscribeUserPosts(user.uid, setUserPosts);
-  }, [user?.uid, firebaseConfigured]);
 
   const displayName =
     profile?.displayName ||
@@ -185,17 +119,17 @@ export function ProfileScreen() {
       try {
         await updateUserProfileData(user.uid, { isPrivate: v });
       } catch {
-        Alert.alert('Hata', 'Ayar kaydedilemedi.');
+        Alert.alert(t('common.error'), t('profile.settingsSaveFailed'));
       }
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const saveNewCollection = useCallback(async () => {
     if (!user?.uid || collSavingRef.current) return;
     const n = newCollName.trim();
     if (!n) {
-      Alert.alert('İsim', 'Koleksiyon adı girin.');
+      Alert.alert(t('camera.nameRequired'), t('profile.collectionNamePrompt'));
       return;
     }
     collSavingRef.current = true;
@@ -206,15 +140,15 @@ export function ProfileScreen() {
       setNewCollType('mixed');
       setNewCollOpen(false);
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Oluşturulamadı.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('collection.createFailed'));
     } finally {
       collSavingRef.current = false;
       setCollSaving(false);
     }
-  }, [newCollName, newCollType, user?.uid]);
+  }, [newCollName, newCollType, user?.uid, t]);
 
   const actorName =
-    profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Kullanıcı';
+    profile?.displayName || user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
   const handleToggleLike = useCallback(
     async (item: FeedPost) => {
@@ -230,10 +164,10 @@ export function ProfileScreen() {
           excerpt: item.excerpt,
         });
       } catch {
-        Alert.alert('Hata', 'Beğeni kaydedilemedi.');
+        Alert.alert(t('common.error'), t('post.likeFailed'));
       }
     },
-    [actorName, user?.uid],
+    [actorName, user?.uid, t],
   );
 
   const submitComment = useCallback(
@@ -245,10 +179,10 @@ export function ProfileScreen() {
         await addPostComment(item.id, user.uid, actorName, text, item.authorUid, item.title);
         setDrafts((d) => ({ ...d, [item.id]: '' }));
       } catch {
-        Alert.alert('Hata', 'Yorum gönderilemedi.');
+        Alert.alert(t('common.error'), t('post.commentFailed'));
       }
     },
-    [actorName, drafts, user?.uid],
+    [actorName, drafts, user?.uid, t],
   );
 
   const sharePost = useCallback((item: FeedPost) => {
@@ -260,47 +194,47 @@ export function ProfileScreen() {
   const confirmDeletePost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid) return;
-      Alert.alert('Gönderiyi sil', 'Bu işlem geri alınamaz.', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.deleteTitle'), t('post.deleteMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deletePost(item.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const confirmDeleteCollection = useCallback(
     (c: UserCollectionDoc) => {
       if (!user?.uid) return;
-      Alert.alert('Koleksiyonu sil', `"${c.name}" kaldırılacak.`, [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: c.name }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deleteUserCollection(user.uid, c.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const [refreshing, setRefreshing] = useState(false);
@@ -429,7 +363,7 @@ export function ProfileScreen() {
           </Text>
           <View style={[styles.headerSide, styles.headerSideRight]}>
             <View style={styles.headerActions}>
-              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityLabel="Ayarlar">
+              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} accessibilityLabel={t('profile.settings')}>
                 <Ionicons name="ellipsis-vertical" size={scale(22)} color={colors.textPrimary} />
               </Pressable>
             </View>
@@ -442,7 +376,7 @@ export function ProfileScreen() {
               onPress={() => avatarUri && setAvatarZoomOpen(true)}
               disabled={!avatarUri}
               style={styles.avatarWrap}
-              accessibilityLabel="Profil fotoğrafını büyüt"
+              accessibilityLabel={t('profile.zoomAvatar')}
             >
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -455,18 +389,18 @@ export function ProfileScreen() {
             <View style={styles.statsCol}>
               <Pressable onPress={openFollowing} style={styles.statPress}>
                 <Text style={styles.statValue}>{following}</Text>
-                <Text style={styles.statLabel}>TAKİP</Text>
+                <Text style={styles.statLabel}>{t('profile.statFollowing')}</Text>
               </Pressable>
               <Pressable onPress={openFollowers} style={styles.statPress}>
                 <Text style={styles.statValue}>{followers}</Text>
-                <Text style={styles.statLabel}>TAKİPÇİ</Text>
+                <Text style={styles.statLabel}>{t('profile.statFollowers')}</Text>
               </Pressable>
               <Pressable onPress={() => setContentTab('likedCollection')} style={styles.statPress}>
                 <Text style={styles.statValue} numberOfLines={1}>
                   {collectionsStat}
                 </Text>
                 <Text style={styles.statLabel} numberOfLines={1}>
-                  KOLEKSİYON
+                  {t('profile.statCollections')}
                 </Text>
               </Pressable>
             </View>
@@ -483,11 +417,11 @@ export function ProfileScreen() {
           onPress={() => navigation.navigate('EditProfile')}
           style={({ pressed }) => [styles.editBtn, pressed && styles.editBtnPressed]}
         >
-          <Text style={styles.editBtnText}>Profili düzenle</Text>
+          <Text style={styles.editBtnText}>{t('profile.editProfile')}</Text>
         </Pressable>
 
         <View style={styles.segmentOuter}>
-          {TABS.map(({ key, label }) => {
+          {tabs.map(({ key, label }) => {
             const active = contentTab === key;
             return (
               <Pressable
@@ -512,12 +446,12 @@ export function ProfileScreen() {
             <Pressable
               onPress={() => setNewCollOpen(true)}
               hitSlop={10}
-              accessibilityLabel="Yeni koleksiyon"
+              accessibilityLabel={t('collection.createNew')}
               disabled={!firebaseConfigured || !user?.uid}
               style={({ pressed }) => [styles.collectionsAddBtn, pressed && styles.headerIconPressed]}
             >
               <Ionicons name="add-circle-outline" size={scale(22)} color={colors.accentPurple} />
-              <Text style={styles.collectionsAddText}>Koleksiyon ekle</Text>
+              <Text style={styles.collectionsAddText}>{t('collection.add')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -525,7 +459,7 @@ export function ProfileScreen() {
         {contentTab === 'posts' ? (
           <View style={styles.postsList}>
             {orderedUserPosts.length === 0 ? (
-              <Text style={styles.emptyLikes}>Henüz gönderi yok.</Text>
+              <Text style={styles.emptyLikes}>{t('profile.noPost')}</Text>
             ) : (
               orderedUserPosts.map((item, index) => (
                 <PostCard
@@ -536,7 +470,7 @@ export function ProfileScreen() {
                   authorAvatarStored={item.authorProfileImageUrl ?? profile?.profileImageUrl}
                   category={item.category}
                   excerpt={item.excerpt}
-                  timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs)}
+                  timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs, appLocaleFromI18n(i18n.language))}
                   showThreadLine={index < orderedUserPosts.length - 1}
                   onPress={item.category === 'music' ? () => openPost(item) : undefined}
                   onPressComment={() => openCommentsDetail(item)}
@@ -591,9 +525,9 @@ export function ProfileScreen() {
         {contentTab === 'likes' ? (
           <View style={styles.listBlock}>
             {!firebaseConfigured || !user?.uid ? (
-              <Text style={styles.emptyLikes}>Giriş yapın ve içerikleri beğenin.</Text>
+              <Text style={styles.emptyLikes}>{t('profile.loginToLike')}</Text>
             ) : likes.length === 0 ? (
-              <Text style={styles.emptyLikes}>Henüz beğeni yok.</Text>
+              <Text style={styles.emptyLikes}>{t('profile.noLikes')}</Text>
             ) : (
               likes.map((item) => (
                 <Pressable
@@ -618,9 +552,9 @@ export function ProfileScreen() {
         {contentTab === 'likedCollection' ? (
           <View style={styles.listBlock}>
             {!firebaseConfigured || !user?.uid ? (
-              <Text style={styles.emptyLikes}>Giriş gerekli.</Text>
+              <Text style={styles.emptyLikes}>{t('common.loginRequired')}</Text>
             ) : collections.length === 0 ? (
-              <Text style={styles.emptyLikes}>Henüz koleksiyon yok. Sağ üstteki + ile oluşturun.</Text>
+              <Text style={styles.emptyLikes}>{t('profile.noCollectionsHint')}</Text>
             ) : (
               <View style={styles.collGrid}>
                 {collections.map((c) => (
@@ -644,14 +578,14 @@ export function ProfileScreen() {
                         {c.name}
                       </Text>
                       <Text style={styles.collTileMeta} numberOfLines={1}>
-                        {COLLECTION_TYPE_LABEL[c.type]} · {c.itemsCount}
+                        {getCollectionTypeLabel(t, c.type)} · {c.itemsCount}
                       </Text>
                     </Pressable>
                     <Pressable
                       onPress={() => confirmDeleteCollection(c)}
                       hitSlop={10}
                       style={styles.collTileTrash}
-                      accessibilityLabel="Koleksiyon seçenekleri"
+                      accessibilityLabel={t('collection.options')}
                     >
                       <Ionicons name="ellipsis-vertical" size={scale(18)} color={colors.textMuted} />
                     </Pressable>
@@ -666,7 +600,7 @@ export function ProfileScreen() {
           onPress={() => void signOut()}
           style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutPressed]}
         >
-          <Text style={styles.logoutText}>Çıkış yap</Text>
+          <Text style={styles.logoutText}>{t('auth.logout')}</Text>
         </Pressable>
       </ScrollView>
 
@@ -698,25 +632,25 @@ export function ProfileScreen() {
       <Modal visible={newCollOpen} transparent animationType="slide" onRequestClose={() => setNewCollOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setNewCollOpen(false)} />
         <View style={styles.modalSheet}>
-          <Text style={styles.modalTitle}>Yeni koleksiyon</Text>
+          <Text style={styles.modalTitle}>{t('collection.newTitle')}</Text>
           <TextInput
             style={styles.collInput}
-            placeholder="Koleksiyon adı"
+            placeholder={t('collection.namePlaceholder')}
             placeholderTextColor={colors.textMuted}
             value={newCollName}
             onChangeText={setNewCollName}
           />
           <View style={styles.typeChips}>
-            {NEW_COLL_TYPES.map((t) => {
-              const active = newCollType === t;
+            {NEW_COLL_TYPES.map((collType) => {
+              const active = newCollType === collType;
               return (
                 <Pressable
-                  key={t}
-                  onPress={() => setNewCollType(t)}
+                  key={collType}
+                  onPress={() => setNewCollType(collType)}
                   style={[styles.typeChip, active && styles.typeChipActive]}
                 >
                   <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                    {COLLECTION_TYPE_LABEL[t]}
+                    {getCollectionTypeLabel(t, collType)}
                   </Text>
                 </Pressable>
               );
@@ -730,11 +664,11 @@ export function ProfileScreen() {
             {collSaving ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.modalPrimaryText}>Oluştur</Text>
+              <Text style={styles.modalPrimaryText}>{t('collection.create')}</Text>
             )}
           </Pressable>
           <Pressable onPress={() => setNewCollOpen(false)} style={styles.modalClose}>
-            <Text style={styles.modalCloseText}>İptal</Text>
+            <Text style={styles.modalCloseText}>{t('common.cancel')}</Text>
           </Pressable>
         </View>
       </Modal>

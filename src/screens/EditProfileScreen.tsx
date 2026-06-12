@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenSafeArea } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,7 @@ type Props = NativeStackScreenProps<AppStackParamList, 'EditProfile'>;
 const AVATAR = scale(96);
 
 export function EditProfileScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { user, firebaseConfigured } = useAuth();
   const [bio, setBio] = useState('');
   const [localImageUri, setLocalImageUri] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const pickImage = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('İzin gerekli', 'Galeri erişimi için izin verin.');
+      Alert.alert(t('editProfile.permissionTitle'), t('editProfile.galleryPermission'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -58,15 +60,15 @@ export function EditProfileScreen({ navigation }: Props) {
     if (!result.canceled && result.assets[0]?.uri) {
       setLocalImageUri(result.assets[0].uri);
     }
-  }, []);
+  }, [t]);
 
   const save = useCallback(async () => {
     if (!user?.uid) {
-      Alert.alert('Oturum yok', 'Profili kaydetmek için giriş yapın.');
+      Alert.alert(t('common.error'), t('editProfile.loginRequired'));
       return;
     }
     if (!firebaseConfigured) {
-      Alert.alert('Firebase yok', 'Yapılandırmayı kontrol edin.');
+      Alert.alert(t('common.error'), t('common.firebaseMissing'));
       return;
     }
     setSaving(true);
@@ -90,12 +92,12 @@ export function EditProfileScreen({ navigation }: Props) {
       }
       navigation.goBack();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Kayıt başarısız.';
-      Alert.alert('Hata', msg);
+      const msg = e instanceof Error ? e.message : t('editProfile.saveFailed');
+      Alert.alert(t('common.error'), msg);
     } finally {
       setSaving(false);
     }
-  }, [bio, firebaseConfigured, localImageUri, navigation, user?.uid]);
+  }, [bio, firebaseConfigured, localImageUri, navigation, user?.uid, t]);
 
   const previewUri = localImageUri ?? profileImageDisplayUri(storedImage ?? undefined);
 
@@ -104,9 +106,9 @@ export function EditProfileScreen({ navigation }: Props) {
       <View style={styles.root}>
       <View style={styles.headerRow}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-          <Text style={styles.headerLink}>İptal</Text>
+          <Text style={styles.headerLink}>{t('common.cancel')}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Profili düzenle</Text>
+        <Text style={styles.headerTitle}>{t('profile.editProfile')}</Text>
         <Pressable
           onPress={() => void save()}
           disabled={saving}
@@ -116,7 +118,7 @@ export function EditProfileScreen({ navigation }: Props) {
           {saving ? (
             <ActivityIndicator size="small" color={colors.accentPurple} />
           ) : (
-            <Text style={styles.headerDone}>Bitti</Text>
+            <Text style={styles.headerDone}>{t('common.done')}</Text>
           )}
         </Pressable>
       </View>
@@ -132,16 +134,16 @@ export function EditProfileScreen({ navigation }: Props) {
           )}
         </Pressable>
         <Pressable onPress={() => void pickImage()}>
-          <Text style={styles.changePhoto}>Fotoğrafı değiştir</Text>
+          <Text style={styles.changePhoto}>{t('editProfile.changePhoto')}</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Hakkımda</Text>
+      <Text style={styles.label}>{t('editProfile.about')}</Text>
       <TextInput
         style={styles.input}
         value={bio}
         onChangeText={setBio}
-        placeholder="Kısa bir bio yazın…"
+        placeholder={t('editProfile.bioPlaceholder')}
         placeholderTextColor={colors.textMuted}
         multiline
         maxLength={280}

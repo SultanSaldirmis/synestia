@@ -2,6 +2,7 @@ import Slider from '@react-native-community/slider';
 import { Alert, Dimensions, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { CachedImage, ScreenSafeArea } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
@@ -25,6 +26,7 @@ function f(ms: number): string {
 }
 
 export function MusicPlayerScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { current, isPlaying, positionMs, durationMs, togglePlayPause, seekTo, skipBy, volume, setVolume } = useMusicPlayer();
   const { user } = useAuth();
   const [saveOpen, setSaveOpen] = useState(false);
@@ -47,7 +49,7 @@ export function MusicPlayerScreen({ navigation }: Props) {
           <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
             <Ionicons name="chevron-back" size={scale(24)} color={colors.textPrimary} />
           </Pressable>
-          <Text style={styles.topTitle}>Müzik Çalar</Text>
+          <Text style={styles.topTitle}>{t('musicPlayer.title')}</Text>
           <View style={styles.topActions}>
             <Pressable
               onPress={() => setSaveOpen(true)}
@@ -72,15 +74,15 @@ export function MusicPlayerScreen({ navigation }: Props) {
             <Text style={styles.artist} numberOfLines={1}>{current.artist}</Text>
             {!current.previewUrl ? (
               <View style={styles.previewCard}>
-                <Text style={styles.previewWarn}>Bu parça telif hakları nedeniyle sadece Spotify'da dinlenebilir.</Text>
+                <Text style={styles.previewWarn}>{t('musicPlayer.spotifyOnlyWarning')}</Text>
                 <Pressable
                   style={styles.spotifyBtn}
                   onPress={() => {
                     const url = current.externalUrl ?? `https://open.spotify.com/search/${encodeURIComponent(current.title)}`;
-                    void Linking.openURL(url).catch(() => Alert.alert('Hata', 'Spotify açılamadı.'));
+                    void Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('musicPlayer.spotifyOpenFailed')));
                   }}
                 >
-                  <Text style={styles.spotifyBtnText}>Spotify'da Aç</Text>
+                  <Text style={styles.spotifyBtnText}>{t('musicPlayer.openSpotify')}</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -126,13 +128,13 @@ export function MusicPlayerScreen({ navigation }: Props) {
             </View>
           </>
         ) : (
-          <View style={styles.empty}><Text style={styles.artist}>Aktif şarkı yok.</Text></View>
+          <View style={styles.empty}><Text style={styles.artist}>{t('musicPlayer.noActiveTrack')}</Text></View>
         )}
       </View>
       <Modal visible={saveOpen} transparent animationType="slide" onRequestClose={() => setSaveOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setSaveOpen(false)} />
         <View style={styles.modalSheet}>
-          <Text style={styles.modalTitle}>Koleksiyona kaydet</Text>
+          <Text style={styles.modalTitle}>{t('collection.saveTitle')}</Text>
           <ScrollView>
             {collections.map((c) => (
               <Pressable
@@ -149,9 +151,9 @@ export function MusicPlayerScreen({ navigation }: Props) {
                   })
                     .then(() => {
                       setSaveOpen(false);
-                      Alert.alert('Kaydedildi');
+                      Alert.alert(t('collection.saved'));
                     })
-                    .catch(() => Alert.alert('Hata', 'Kaydedilemedi.'));
+                    .catch(() => Alert.alert(t('common.error'), t('collection.saveFailed')));
                 }}
               >
                 <Ionicons name="folder-open-outline" size={scale(20)} color={colors.accentPurple} />
@@ -162,7 +164,7 @@ export function MusicPlayerScreen({ navigation }: Props) {
           <TextInput
             value={newName}
             onChangeText={setNewName}
-            placeholder="Yeni koleksiyon adı"
+            placeholder={t('collection.newNamePlaceholder')}
             placeholderTextColor={colors.textMuted}
             style={styles.input}
           />
@@ -185,10 +187,10 @@ export function MusicPlayerScreen({ navigation }: Props) {
                   setNewName('');
                   setSaveOpen(false);
                 })
-                .catch(() => Alert.alert('Hata', 'Oluşturulamadı.'));
+                .catch(() => Alert.alert(t('common.error'), t('collection.createFailed')));
             }}
           >
-            <Text style={styles.createBtnText}>Yeni oluştur ve kaydet</Text>
+            <Text style={styles.createBtnText}>{t('collection.createAndSave')}</Text>
           </Pressable>
         </View>
       </Modal>

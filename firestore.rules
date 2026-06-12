@@ -2,54 +2,120 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Kullanıcı profili ve TÜM alt koleksiyonlar
-    // (likes, collections, notifications, following, followers)
-    // Yalnızca kendi verisine okuma/yazma izni
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Postlar — okuma tüm giriş yapmış kullanıcılara,
-    // oluşturma kendi uid'siyle, güncelleme/silme yalnızca yazara
-    match /posts/{postId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-                    && request.auth.uid == request.resource.data.authorUid;
-      allow update, delete: if request.auth != null
-                             && request.auth.uid == resource.data.authorUid;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-      // Post beğenileri — herkes kendi uid yoluyla yazar
-      match /likes/{uid} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == uid;
+    function onlyUserCounterFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['followersCount', 'followingCount', 'collectionsCount']);
+    }
+
+    function onlyPostSocialCounters() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['likesCount', 'commentCount']);
+    }
+
+    // Kullanıcı profili (kök belge)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || (isSignedIn() && onlyUserCounterFields());
+      allow delete: if isOwner(userId);
+
+      // Takipçiler — takip eden kullanıcı kendi kaydını oluşturur/siler
+      match /followers/{followerId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() && request.auth.uid == followerId;
       }
 
-      // Post yorumları — okuma/ekleme herkese açık,
-      // silme yalnızca yorum sahibine
+      // Takip edilenler — yalnızca profil sahibi yönetir
+      match /following/{targetId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isOwner(userId);
+      }
+
+      // Takip istekleri — istek gönderen oluşturur; profil sahibi veya gönderen siler
+      match /followRequests/{fromUid} {
+        allow read: if isOwner(userId) || (isSignedIn() && request.auth.uid == fromUid);
+        allow create: if isSignedIn() && request.auth.uid == fromUid;
+        allow delete: if isOwner(userId) || (isSignedIn() && request.auth.uid == fromUid);
+      }
+
+      // Bildirimler — herhangi giriş yapmış kullanıcı oluşturabilir; okuma/güncelleme sahibe
+      match /notifications/{notifId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isSignedIn();
+      }
+
+      // Beğeniler — yalnızca profil sahibi
+      match /likes/{postId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+
+      // Koleksiyonlar — okuma herkese; yazma sahibe
+      match /collections/{collectionId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // Postlar
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.auth.uid == request.resource.data.authorUid;
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.authorUid
+        || onlyPostSocialCounters()
+      );
+      allow delete: if isSignedIn()
+                    && request.auth.uid == resource.data.authorUid;
+
+      match /likes/{uid} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == uid;
+      }
+
       match /comments/{commentId} {
-        allow read, create: if request.auth != null;
-        allow delete: if request.auth != null
+        allow read, create: if isSignedIn();
+        allow delete: if isSignedIn()
                       && request.auth.uid == resource.data.authorUid;
       }
     }
 
     // Katalog kitap puanlamaları
     match /bookRatings/{itemId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+
+      match /ratings/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // Katalog film puanlamaları
     match /movieRatings/{itemId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+
+      match /ratings/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // Genel katalog yorumları
     match /globalContentComments/{itemId}/comments/{commentId} {
-      allow read, create: if request.auth != null;
-      allow delete: if request.auth != null
-                    && request.auth.uid == resource.data.authorId;
+      allow read, create: if isSignedIn();
+      allow delete: if isSignedIn()
+                    && request.auth.uid == resource.data.authorUid;
     }
   }
 }

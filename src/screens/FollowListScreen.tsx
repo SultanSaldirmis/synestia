@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenSafeArea } from '../components';
@@ -22,6 +23,7 @@ const edges = ['top', 'left', 'right', 'bottom'] as const;
 type Row = { key: string; label: string; avatarUri?: string };
 
 export function FollowListScreen({ route }: Props) {
+  const { t } = useTranslation();
   const { mode, userId: routeUserId } = route.params;
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -58,7 +60,7 @@ export function FollowListScreen({ route }: Props) {
     <ScreenSafeArea edges={edges}>
       <View style={styles.wrap}>
         {!targetUid ? (
-          <Text style={styles.hint}>Oturum veya kullanıcı gerekli.</Text>
+          <Text style={styles.hint}>{t('follow.sessionOrUserRequired')}</Text>
         ) : null}
         <FlatList
           data={rows}
@@ -87,7 +89,7 @@ export function FollowListScreen({ route }: Props) {
           )}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {mode === 'collections' ? 'Henüz koleksiyon yok.' : 'Liste boş.'}
+              {mode === 'collections' ? t('profile.noCollections') : t('follow.emptyList')}
             </Text>
           }
           contentContainerStyle={styles.list}

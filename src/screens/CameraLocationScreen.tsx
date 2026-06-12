@@ -38,12 +38,11 @@ import {
 } from '../services/firestoreService';
 import { colors, spacing, spacingVertical, typography, radii, scale } from '../theme';
 
-// Gümüşhane Üniversitesi Müh. Fak.
-const FACULTY_COORDS = { latitude: 40.4567, longitude: 39.5 };
+// Gümüşhane Üniversitesi Müh. Fak. — MapPickerScreen varsayılan bölgesini kullanır
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CameraLocation'>;
 
-export function CameraLocationScreen(_props: Props) {
+export function CameraLocationScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -105,7 +104,7 @@ export function CameraLocationScreen(_props: Props) {
       }
       showMessage({ message: t('camera.photoSaved'), type: 'success' });
     } catch (e) {
-      showMessage({ message: 'Fotoğraf çekilemedi: ' + String(e), type: 'danger' });
+      showMessage({ message: t('camera.photoCaptureFailed', { error: String(e) }), type: 'danger' });
     }
   }
 
@@ -132,45 +131,42 @@ export function CameraLocationScreen(_props: Props) {
       }
       showMessage({ message: t('camera.locationSaved'), type: 'success' });
     } catch (e) {
-      showMessage({ message: 'Konum alınamadı: ' + String(e), type: 'danger' });
+      showMessage({ message: t('camera.locationFailed', { error: String(e) }), type: 'danger' });
     } finally {
       setGpsLoading(false);
     }
   }
 
-  // -------- Manuel Harita --------
-
-  const [showMap, setShowMap] = useState(false);
-  const [tempPin, setTempPin] = useState<{ latitude: number; longitude: number } | null>(null);
+  // -------- Manuel Harita (stack navigasyon) --------
 
   function openMapPicker() {
-    setTempPin(locationCoords);
-    setShowMap(true);
-  }
-
-  async function confirmMapSelection() {
-    if (!tempPin) return;
-    setLocationCoords(tempPin);
-    setShowMap(false);
-    const uid = user?.uid ?? 'anonymous';
-    if (localId === null) {
-      const newId = await insertMoment({ uid, latitude: tempPin.latitude, longitude: tempPin.longitude });
-      setLocalId(newId);
-    } else {
-      await updateMomentLocation(localId, tempPin.latitude, tempPin.longitude);
-    }
-    showMessage({ message: t('camera.locationSaved'), type: 'success' });
+    navigation.navigate('MapPicker', {
+      initialCoords: locationCoords ?? undefined,
+      onConfirm: (lat, lng) => {
+        void (async () => {
+          setLocationCoords({ latitude: lat, longitude: lng });
+          const uid = user?.uid ?? 'anonymous';
+          if (localId === null) {
+            const newId = await insertMoment({ uid, latitude: lat, longitude: lng });
+            setLocalId(newId);
+          } else {
+            await updateMomentLocation(localId, lat, lng);
+          }
+          showMessage({ message: t('camera.locationSaved'), type: 'success' });
+        })();
+      },
+    });
   }
 
   // -------- Koleksiyon Modal --------
 
   async function openCollectionModal() {
     if (!user?.uid) {
-      Alert.alert('Giriş Gerekli', 'Koleksiyona kaydetmek için giriş yapın.');
+      Alert.alert(t('camera.loginRequired'), t('camera.loginRequiredCollection'));
       return;
     }
     if (!photoUri) {
-      Alert.alert('Fotoğraf Gerekli', 'Önce fotoğraf çekin.');
+      Alert.alert(t('camera.photoRequired'), t('camera.photoRequiredFirst'));
       return;
     }
     setCollLoading(true);
@@ -199,13 +195,13 @@ export function CameraLocationScreen(_props: Props) {
       const thumbUrl = `data:image/jpeg;base64,${thumb.base64 ?? ''}`;
       await saveContentToUserCollection(user.uid, collectionId, {
         contentType: 'moment',
-        title: momentTitle.trim() || `Anı — ${new Date().toLocaleDateString('tr-TR')}`,
+        title: momentTitle.trim() || `${t('camera.momentDefaultTitle')} — ${new Date().toLocaleDateString()}`,
         imageUrl: thumbUrl,
       });
       setCollModalVisible(false);
-      showMessage({ message: 'Koleksiyona kaydedildi', type: 'success' });
+      showMessage({ message: t('camera.collectionSaved'), type: 'success' });
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Kaydedilemedi.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('camera.saveFailed'));
     } finally {
       setSavingColl(false);
     }
@@ -214,7 +210,7 @@ export function CameraLocationScreen(_props: Props) {
   async function createAndSave() {
     const name = newCollName.trim();
     if (!name) {
-      Alert.alert('İsim Gerekli', 'Koleksiyon ismi girin.');
+      Alert.alert(t('camera.nameRequired'), t('camera.collectionNameRequired'));
       return;
     }
     if (!user?.uid || !photoUri) return;
@@ -229,14 +225,14 @@ export function CameraLocationScreen(_props: Props) {
       const thumbUrl2 = `data:image/jpeg;base64,${thumb2.base64 ?? ''}`;
       await saveContentToUserCollection(user.uid, collId, {
         contentType: 'moment',
-        title: momentTitle.trim() || `Anı — ${new Date().toLocaleDateString('tr-TR')}`,
+        title: momentTitle.trim() || `${t('camera.momentDefaultTitle')} — ${new Date().toLocaleDateString()}`,
         imageUrl: thumbUrl2,
       });
       setCollModalVisible(false);
       setNewCollName('');
-      showMessage({ message: `"${name}" koleksiyonuna kaydedildi`, type: 'success' });
+      showMessage({ message: t('camera.savedToCollection', { name }), type: 'success' });
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Oluşturulamadı.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('camera.createFailed'));
     } finally {
       setSavingColl(false);
     }
@@ -246,17 +242,17 @@ export function CameraLocationScreen(_props: Props) {
 
   async function publishMoment() {
     if (!photoUri) {
-      Alert.alert('Fotoğraf Gerekli', 'Paylaşmak için önce fotoğraf çekin.');
+      Alert.alert(t('camera.photoRequired'), t('camera.photoRequiredShare'));
       return;
     }
     if (!user?.uid) {
-      Alert.alert('Giriş Gerekli', 'Gönderi paylaşmak için giriş yapın.');
+      Alert.alert(t('camera.loginRequired'), t('camera.loginRequiredShare'));
       return;
     }
     setPublishing(true);
     try {
       const profile = await getUserProfileOnce(user.uid);
-      const displayName = profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Kullanıcı';
+      const displayName = profile?.displayName || user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
 
       // Firebase Storage olmadan: fotoğrafı küçültüp base64 olarak Firestore'a göm
       const compressed = await ImageManipulator.manipulateAsync(
@@ -269,68 +265,24 @@ export function CameraLocationScreen(_props: Props) {
       const postId = await createMomentPost(
         user.uid,
         { displayName, profileImageUrl: profile?.profileImageUrl, isPrivate: profile?.isPrivate },
-        shareText.trim() || 'Bir anı paylaştı.',
+        shareText.trim() || t('camera.momentDefaultCaption'),
         downloadUrl,
         locationCoords ?? undefined,
       );
 
       await saveMomentToCollection(user.uid, downloadUrl, postId);
 
-      showMessage({ message: 'Anı başarıyla paylaşıldı!', type: 'success' });
+      showMessage({ message: t('camera.momentPublished'), type: 'success' });
 
       setPhotoUri(null);
       setLocationCoords(null);
       setShareText('');
       setLocalId(null);
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Paylaşılamadı.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('camera.publishFailed'));
     } finally {
       setPublishing(false);
     }
-  }
-
-  // -------- Tam ekran harita seçim ekranı --------
-
-  if (showMap) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.mapHeader}>
-          <TouchableOpacity onPress={() => setShowMap(false)} style={styles.iconBtn}>
-            <Ionicons name="arrow-back" size={scale(24)} color={colors.accentPurple} />
-          </TouchableOpacity>
-          <Text style={styles.mapHeaderTitle}>{t('map.title')}</Text>
-          <View style={styles.iconBtn} />
-        </View>
-        <Text style={styles.mapHint}>{t('map.hint')}</Text>
-        <MapView
-          style={{ flex: 1 }}
-          initialRegion={{
-            ...(tempPin ?? FACULTY_COORDS),
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          onPress={(e) => setTempPin(e.nativeEvent.coordinate)}
-        >
-          {tempPin && <Marker coordinate={tempPin} pinColor={colors.accentPurple} />}
-        </MapView>
-        <View style={styles.mapFooter}>
-          {tempPin && (
-            <Text style={styles.coordsText}>
-              {tempPin.latitude.toFixed(5)}, {tempPin.longitude.toFixed(5)}
-            </Text>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryBtn, !tempPin && styles.btnDisabled]}
-            onPress={() => void confirmMapSelection()}
-            disabled={!tempPin}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="checkmark-circle" size={scale(20)} color={colors.textOnAccent} />
-            <Text style={styles.primaryBtnText}>{t('map.confirm')}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
   }
 
   // -------- Kamera Görünümü --------
@@ -384,7 +336,7 @@ export function CameraLocationScreen(_props: Props) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Koleksiyona Kaydet</Text>
+              <Text style={styles.modalTitle}>{t('collection.saveTitle')}</Text>
               <TouchableOpacity onPress={() => setCollModalVisible(false)} style={styles.iconBtn}>
                 <Ionicons name="close" size={scale(22)} color={colors.textMuted} />
               </TouchableOpacity>
@@ -396,10 +348,10 @@ export function CameraLocationScreen(_props: Props) {
               <>
                 {/* Moment için özel isim */}
                 <View style={styles.momentTitleWrap}>
-                  <Text style={styles.momentTitleLabel}>Anı Adı</Text>
+                  <Text style={styles.momentTitleLabel}>{t('camera.momentNameLabel')}</Text>
                   <TextInput
                     style={styles.newCollInput}
-                    placeholder={`Anı — ${new Date().toLocaleDateString('tr-TR')}`}
+                    placeholder={t('camera.momentNamePlaceholder', { date: new Date().toLocaleDateString() })}
                     placeholderTextColor={colors.textMuted}
                     value={momentTitle}
                     onChangeText={setMomentTitle}
@@ -422,7 +374,7 @@ export function CameraLocationScreen(_props: Props) {
                         <Ionicons name="albums-outline" size={scale(20)} color={colors.accentPurple} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.collItemName}>{item.name}</Text>
-                          <Text style={styles.collItemCount}>{item.itemsCount} öğe</Text>
+                          <Text style={styles.collItemCount}>{t('collection.itemCount', { count: item.itemsCount })}</Text>
                         </View>
                         {savingColl ? (
                           <ActivityIndicator size="small" color={colors.accentPurple} />
@@ -440,7 +392,7 @@ export function CameraLocationScreen(_props: Props) {
                   <View style={styles.newCollForm}>
                     <TextInput
                       style={styles.newCollInput}
-                      placeholder="Koleksiyon adı..."
+                      placeholder={t('collection.namePlaceholder')}
                       placeholderTextColor={colors.textMuted}
                       value={newCollName}
                       onChangeText={setNewCollName}
@@ -458,7 +410,7 @@ export function CameraLocationScreen(_props: Props) {
                       ) : (
                         <Ionicons name="add-circle" size={scale(20)} color={colors.textOnAccent} />
                       )}
-                      <Text style={styles.primaryBtnText}>Oluştur ve Kaydet</Text>
+                      <Text style={styles.primaryBtnText}>{t('collection.createAndSave')}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -468,7 +420,7 @@ export function CameraLocationScreen(_props: Props) {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="add-circle-outline" size={scale(20)} color={colors.accentPurple} />
-                    <Text style={styles.newCollBtnText}>Yeni Koleksiyon Oluştur</Text>
+                    <Text style={styles.newCollBtnText}>{t('collection.createNew')}</Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -484,7 +436,7 @@ export function CameraLocationScreen(_props: Props) {
           <View style={styles.section}>
             <View style={styles.sectionRow}>
               <Ionicons name="camera" size={scale(18)} color={colors.accentPurple} />
-              <Text style={styles.sectionTitle}>Fotoğraf</Text>
+              <Text style={styles.sectionTitle}>{t('camera.photoSection')}</Text>
             </View>
 
             {photoUri ? (
@@ -508,7 +460,7 @@ export function CameraLocationScreen(_props: Props) {
                     activeOpacity={0.85}
                   >
                     <Ionicons name="bookmark-outline" size={scale(18)} color={colors.textOnAccent} />
-                    <Text style={styles.collSaveBtnText}>Koleksiyon</Text>
+                    <Text style={styles.collSaveBtnText}>{t('camera.collection')}</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -525,12 +477,12 @@ export function CameraLocationScreen(_props: Props) {
             <View style={styles.section}>
               <View style={styles.sectionRow}>
                 <Ionicons name="paper-plane" size={scale(18)} color={colors.accentPurple} />
-                <Text style={styles.sectionTitle}>Akışa Paylaş</Text>
+                <Text style={styles.sectionTitle}>{t('camera.shareToFeed')}</Text>
               </View>
-              <Text style={styles.shareHint}>Bu anıyı bir mesajla akışa paylaşın</Text>
+              <Text style={styles.shareHint}>{t('camera.shareHint')}</Text>
               <TextInput
                 style={styles.shareInput}
-                placeholder="Bir şeyler yaz... (isteğe bağlı)"
+                placeholder={t('camera.sharePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={shareText}
                 onChangeText={setShareText}
@@ -549,7 +501,7 @@ export function CameraLocationScreen(_props: Props) {
                   <Ionicons name="share-social" size={scale(20)} color={colors.textOnAccent} />
                 )}
                 <Text style={styles.publishBtnText}>
-                  {publishing ? 'Paylaşılıyor...' : 'Akışa Paylaş'}
+                  {publishing ? t('camera.publishing') : t('camera.shareToFeed')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -745,35 +697,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   coordsText: { ...typography.meta, color: colors.textSecondary, textAlign: 'center' },
-
-  // Map full-screen header
-  mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacingVertical.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  mapHeaderTitle: {
-    ...typography.subtitle,
-    color: colors.textPrimary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  mapHint: {
-    ...typography.meta,
-    color: colors.textMuted,
-    textAlign: 'center',
-    padding: spacing.sm,
-  },
-  mapFooter: {
-    padding: spacing.lg,
-    gap: spacingVertical.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
 
   // Share panel
   shareHint: { ...typography.caption, color: colors.textMuted },

@@ -19,6 +19,7 @@ import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { store, persistor } from './src/store';
 import { AuthProvider } from './src/context/AuthContext';
 import { MusicPlayerProvider } from './src/context/MusicPlayerContext';
+import { LanguageBootstrap } from './src/components/LanguageBootstrap';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { initExpoNotifications } from './src/services/notificationService';
 import { colors } from './src/theme';
@@ -85,13 +86,15 @@ export default function App() {
         persistor={persistor}
       >
         <SafeAreaProvider>
-          <AuthProvider>
-            <MusicPlayerProvider>
-              <NavigationContainer theme={navTheme}>
-                <AppInner />
-              </NavigationContainer>
-            </MusicPlayerProvider>
-          </AuthProvider>
+          <LanguageBootstrap>
+            <AuthProvider>
+              <MusicPlayerProvider>
+                <NavigationContainer theme={navTheme}>
+                  <AppInner />
+                </NavigationContainer>
+              </MusicPlayerProvider>
+            </AuthProvider>
+          </LanguageBootstrap>
         </SafeAreaProvider>
       </PersistGate>
     </Provider>

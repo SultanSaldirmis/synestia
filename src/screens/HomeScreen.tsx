@@ -20,6 +20,7 @@ import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { PostCard, ScreenSafeArea } from '../components';
 import { useDrawer } from '../navigation/DrawerNavigator';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
@@ -40,7 +41,7 @@ import {
   getCatalogRatingsByRefs,
 } from '../services/firestoreService';
 import { buildBookmarkPayloadFromPost } from '../utils/buildBookmarkPayload';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { colors, roundLayout, scale, spacing, spacingVertical, typography } from '../theme';
 
 type HomeNav = CompositeNavigationProp<
@@ -56,6 +57,7 @@ const safeEdges = ['top', 'left', 'right', 'bottom'] as const;
 
 export function HomeScreen() {
   const navigation = useNavigation<HomeNav>();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { openDrawer } = useDrawer();
   const [feedReady, setFeedReady] = useState(false);
@@ -139,7 +141,7 @@ export function HomeScreen() {
     void getCatalogRatingsByRefs(refs).then(setContentRatings).catch(() => {});
   }, [posts]);
 
-  const actorName = user?.displayName || user?.email?.split('@')[0] || 'Kullanıcı';
+  const actorName = user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -223,7 +225,7 @@ export function HomeScreen() {
   const handleToggleLike = useCallback(
     async (item: FeedPost) => {
       if (!user?.uid) {
-        Alert.alert('Oturum', 'Beğenmek için giriş yapın.');
+        Alert.alert(t('post.loginRequired'), t('post.loginRequiredLike'));
         return;
       }
       if (likeBusyRef.current.has(item.id)) return;
@@ -239,18 +241,18 @@ export function HomeScreen() {
           excerpt: item.excerpt,
         });
       } catch {
-        Alert.alert('Hata', 'Beğeni kaydedilemedi.');
+        Alert.alert(t('common.error'), t('post.likeFailed'));
       } finally {
         likeBusyRef.current.delete(item.id);
       }
     },
-    [actorName, user?.uid],
+    [actorName, user?.uid, t],
   );
 
   const submitComment = useCallback(
     async (item: FeedPost) => {
       if (!user?.uid) {
-        Alert.alert('Oturum', 'Yorum için giriş yapın.');
+        Alert.alert(t('post.loginRequired'), t('post.loginRequiredComment'));
         return;
       }
       const text = (drafts[item.id] ?? '').trim();
@@ -260,10 +262,10 @@ export function HomeScreen() {
         await addPostComment(item.id, user.uid, actorName, text, item.authorUid, item.title, profile?.profileImageUrl);
         setDrafts((d) => ({ ...d, [item.id]: '' }));
       } catch {
-        Alert.alert('Hata', 'Yorum gönderilemedi.');
+        Alert.alert(t('common.error'), t('post.commentFailed'));
       }
     },
-    [actorName, drafts, user?.uid],
+    [actorName, drafts, user?.uid, t],
   );
 
   const sharePost = useCallback((item: FeedPost) => {
@@ -275,40 +277,40 @@ export function HomeScreen() {
   const confirmDeletePost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid || item.authorUid !== user.uid) return;
-      Alert.alert('Gönderiyi sil', 'Bu işlem geri alınamaz.', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.deleteTitle'), t('post.deleteMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deletePost(item.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const handleEditPost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid || item.authorUid !== user.uid) return;
       Alert.prompt?.(
-        'Gönderiyi düzenle',
+        t('post.editTitle'),
         undefined,
         [
-          { text: 'İptal', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Kaydet',
+            text: t('common.save'),
             onPress: (newText?: string) => {
               if (!newText?.trim()) return;
               void updatePostText(item.id, user.uid, newText).catch((e) =>
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Düzenlenemedi.'),
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.editFailed')),
               );
             },
           },
@@ -316,28 +318,28 @@ export function HomeScreen() {
         'plain-text',
         item.excerpt,
       ) ??
-        Alert.alert('Düzenle', 'Bu özellik şu anda sadece iOS\'ta destekleniyor.');
+        Alert.alert(t('common.edit'), t('post.editIosOnly'));
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const handleReportPost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid) return;
-      Alert.alert('Raporla', 'Bu gönderiyi raporlamak istiyor musunuz?', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.reportTitle'), t('post.reportMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Raporla',
+          text: t('post.report'),
           style: 'destructive',
           onPress: () => {
             void reportPost(item.id, user.uid, 'Uygunsuz içerik')
-              .then(() => Alert.alert('Teşekkürler', 'Rapor gönderildi.'))
-              .catch(() => Alert.alert('Hata', 'Rapor gönderilemedi.'));
+              .then(() => Alert.alert(t('common.thanks'), t('post.reportSent')))
+              .catch(() => Alert.alert(t('common.error'), t('post.reportFailed')));
           },
         },
       ]);
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const navigateToProfile = useCallback(
@@ -361,7 +363,7 @@ export function HomeScreen() {
         authorAvatarStored={item.authorProfileImageUrl}
         category={item.category}
         excerpt={item.excerpt}
-        timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs)}
+        timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs, appLocaleFromI18n(i18n.language))}
         showThreadLine={index < posts.length - 1}
         onPress={item.category === 'music' ? () => openDetail(item) : undefined}
         onAvatarPress={item.authorUid ? () => navigateToProfile(item.authorUid) : undefined}
@@ -432,6 +434,8 @@ export function HomeScreen() {
       submitComment,
       user?.uid,
       nowMs,
+      i18n.language,
+      t,
     ],
   );
 
@@ -442,7 +446,7 @@ export function HomeScreen() {
       <ScreenSafeArea edges={safeEdges}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.accentPurple} />
-          <Text style={styles.loadingText}>Akış yükleniyor…</Text>
+          <Text style={styles.loadingText}>{t('home.loading')}</Text>
         </View>
       </ScreenSafeArea>
     );
@@ -487,7 +491,7 @@ export function HomeScreen() {
           <Pressable
             style={styles.fab}
             onPress={() => navigation.navigate('CreatePost')}
-            accessibilityLabel="Yeni gönderi"
+            accessibilityLabel={t('post.createFab')}
           >
             <Ionicons name="create-outline" size={scale(28)} color="#ffffff" />
           </Pressable>

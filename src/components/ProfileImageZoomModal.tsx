@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, scale, spacing, spacingVertical, typography } from '../theme';
 
 type Props = {
@@ -9,11 +10,12 @@ type Props = {
 };
 
 export function ProfileImageZoomModal({ visible, imageUri, onClose }: Props) {
+  const { t } = useTranslation();
   if (!imageUri) return null;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Kapat" />
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.close')} />
         <View style={styles.center} pointerEvents="box-none">
           <Image
             source={{ uri: imageUri }}
@@ -22,7 +24,7 @@ export function ProfileImageZoomModal({ visible, imageUri, onClose }: Props) {
             cachePolicy="disk"
           />
           <Pressable onPress={onClose} style={styles.closeBtn}>
-            <Text style={styles.closeText}>Kapat</Text>
+            <Text style={styles.closeText}>{t('common.close')}</Text>
           </Pressable>
         </View>
       </View>

@@ -14,6 +14,7 @@ import {
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { PostCard, ProfileImageZoomModal, ScreenSafeArea } from '../components';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +43,7 @@ import {
   type UserProfileDoc,
 } from '../services/firestoreService';
 import { buildBookmarkPayloadFromPost } from '../utils/buildBookmarkPayload';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography } from '../theme';
 
@@ -56,15 +57,10 @@ const PROFILE_CARD_RADIUS = 25;
 
 type TabKey = 'posts' | 'likes' | 'collections';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'posts', label: 'Gönderiler' },
-  { key: 'likes', label: 'Beğenilenler' },
-  { key: 'collections', label: 'Koleksiyonlar' },
-];
-
 export function UserProfileScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
+  const { t, i18n } = useTranslation();
   const { userId } = route.params;
   const { user, firebaseConfigured } = useAuth();
   const [profile, setProfile] = useState<UserProfileDoc | null>(null);
@@ -92,6 +88,15 @@ export function UserProfileScreen() {
             (b.createdAtMs ?? b.createdAtClientMs ?? 0) - (a.createdAtMs ?? a.createdAtClientMs ?? 0),
         ),
     [posts],
+  );
+
+  const tabs = useMemo(
+    (): { key: TabKey; label: string }[] => [
+      { key: 'posts', label: t('profile.posts') },
+      { key: 'likes', label: t('profile.liked') },
+      { key: 'collections', label: t('profile.collections') },
+    ],
+    [t],
   );
 
   const isSelf = user?.uid === userId;
@@ -163,7 +168,7 @@ export function UserProfileScreen() {
   }, [firebaseConfigured, user?.uid]);
 
   const displayName =
-    profile?.displayName || profile?.email?.split('@')[0] || 'Kullanıcı';
+    profile?.displayName || profile?.email?.split('@')[0] || t('common.defaultUser');
   const isPrivate = profile?.isPrivate === true;
   const canView = isSelf || !isPrivate || following;
 
@@ -178,7 +183,7 @@ export function UserProfileScreen() {
 
   const onFollowPress = useCallback(async () => {
     if (!user?.uid) {
-      Alert.alert('Oturum', 'Takip için giriş yapın.');
+      Alert.alert(t('post.loginRequired'), t('follow.loginRequired'));
       return;
     }
     setFollowBusy(true);
@@ -189,16 +194,16 @@ export function UserProfileScreen() {
         return;
       }
       const fromName =
-        user.displayName || user.email?.split('@')[0] || 'Kullanıcı';
+        user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
       const r = await followUser(user.uid, fromName, userId, isPrivate);
       if (r === 'requested') setPending(true);
       else setFollowing(true);
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'İşlem başarısız.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('common.actionFailed'));
     } finally {
       setFollowBusy(false);
     }
-  }, [following, isPrivate, user, userId]);
+  }, [following, isPrivate, user, userId, t]);
 
   const openPost = useCallback(
     (item: FeedPost) => {
@@ -287,14 +292,14 @@ export function UserProfileScreen() {
   );
 
   const followLabel = following
-    ? 'Takipten çık'
+    ? t('follow.unfollow')
     : pending
-      ? 'İstek gönderildi'
+      ? t('follow.requestSent')
       : isPrivate
-        ? 'Takip isteği gönder'
-        : 'Takip et';
+        ? t('follow.sendRequest')
+        : t('follow.follow');
 
-  const actorName = user?.displayName || user?.email?.split('@')[0] || 'Kullanıcı';
+  const actorName = user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
   const handleToggleLike = useCallback(
     async (item: FeedPost) => {
@@ -310,10 +315,10 @@ export function UserProfileScreen() {
           excerpt: item.excerpt,
         });
       } catch {
-        Alert.alert('Hata', 'Beğeni kaydedilemedi.');
+        Alert.alert(t('common.error'), t('post.likeFailed'));
       }
     },
-    [actorName, user?.uid],
+    [actorName, user?.uid, t],
   );
 
   const submitComment = useCallback(
@@ -326,10 +331,10 @@ export function UserProfileScreen() {
         await addPostComment(item.id, user.uid, actorName, text, item.authorUid, item.title, p?.profileImageUrl);
         setDrafts((d) => ({ ...d, [item.id]: '' }));
       } catch {
-        Alert.alert('Hata', 'Yorum gönderilemedi.');
+        Alert.alert(t('common.error'), t('post.commentFailed'));
       }
     },
-    [actorName, drafts, user?.uid],
+    [actorName, drafts, user?.uid, t],
   );
 
   const sharePost = useCallback((item: FeedPost) => {
@@ -341,40 +346,40 @@ export function UserProfileScreen() {
   const confirmDeletePost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid || !isSelf) return;
-      Alert.alert('Gönderiyi sil', 'Bu işlem geri alınamaz.', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.deleteTitle'), t('post.deleteMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deletePost(item.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [isSelf, user?.uid],
+    [isSelf, user?.uid, t],
   );
 
   const handleEditPost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid || !isSelf) return;
       Alert.prompt?.(
-        'Gönderiyi düzenle',
+        t('post.editTitle'),
         undefined,
         [
-          { text: 'İptal', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Kaydet',
+            text: t('common.save'),
             onPress: (newText?: string) => {
               if (!newText?.trim()) return;
               void updatePostText(item.id, user.uid, newText).catch((e) =>
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Düzenlenemedi.'),
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.editFailed')),
               );
             },
           },
@@ -383,74 +388,74 @@ export function UserProfileScreen() {
         item.excerpt,
       );
     },
-    [isSelf, user?.uid],
+    [isSelf, user?.uid, t],
   );
 
   const handleReportPost = useCallback(
     (item: FeedPost) => {
       if (!user?.uid) return;
-      Alert.alert('Raporla', 'Bu gönderiyi raporlamak istiyor musunuz?', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.reportTitle'), t('post.reportMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Raporla',
+          text: t('post.report'),
           style: 'destructive',
           onPress: () => {
             void reportPost(item.id, user.uid, 'Uygunsuz içerik')
-              .then(() => Alert.alert('Teşekkürler', 'Rapor gönderildi.'))
-              .catch(() => Alert.alert('Hata', 'Rapor gönderilemedi.'));
+              .then(() => Alert.alert(t('common.thanks'), t('post.reportSent')))
+              .catch(() => Alert.alert(t('common.error'), t('post.reportFailed')));
           },
         },
       ]);
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const confirmDeleteCollection = useCallback(
     (c: UserCollectionDoc) => {
       if (!user?.uid || !isSelf) return;
-      Alert.alert('Koleksiyonu sil', `"${c.name}" kaldırılacak.`, [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: c.name }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deleteUserCollection(userId, c.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [isSelf, user?.uid, userId],
+    [isSelf, user?.uid, userId, t],
   );
 
   const createNewCollection = useCallback(() => {
     if (!user?.uid || !isSelf) return;
     Alert.prompt?.(
-      'Yeni koleksiyon',
-      'Koleksiyon adı girin:',
+      t('collection.newTitle'),
+      t('collection.namePrompt'),
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Oluştur',
+          text: t('collection.create'),
           onPress: (name?: string) => {
             if (!name?.trim()) return;
             setNewCollSaving(true);
             void createUserCollection(user.uid, name.trim(), 'mixed')
               .then(() => {})
-              .catch((e) => Alert.alert('Hata', e instanceof Error ? e.message : 'Oluşturulamadı.'))
+              .catch((e) => Alert.alert(t('common.error'), e instanceof Error ? e.message : t('collection.createFailed')))
               .finally(() => setNewCollSaving(false));
           },
         },
       ],
       'plain-text',
     ) ??
-      Alert.alert('Koleksiyon', 'Bu özellik profil sekmesinden kullanılabilir.');
-  }, [isSelf, user?.uid]);
+      Alert.alert(t('profile.collections'), t('collection.androidOnly'));
+  }, [isSelf, user?.uid, t]);
 
   const openFollowers = useCallback(() => {
     navigation.navigate('FollowList', { mode: 'followers', userId });
@@ -504,7 +509,7 @@ export function UserProfileScreen() {
               onPress={() => avatarUri && setAvatarZoomOpen(true)}
               disabled={!avatarUri}
               style={styles.avatarWrap}
-              accessibilityLabel="Profil fotoğrafını büyüt"
+              accessibilityLabel={t('profile.zoomAvatar')}
             >
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -517,15 +522,15 @@ export function UserProfileScreen() {
             <View style={styles.statsCol}>
               <Pressable onPress={openFollowing} style={styles.statPress}>
                 <Text style={styles.statValue}>{followingN}</Text>
-                <Text style={styles.statLabel}>TAKİP</Text>
+                <Text style={styles.statLabel}>{t('profile.statFollowing')}</Text>
               </Pressable>
               <Pressable onPress={openFollowers} style={styles.statPress}>
                 <Text style={styles.statValue}>{followers}</Text>
-                <Text style={styles.statLabel}>TAKİPÇİ</Text>
+                <Text style={styles.statLabel}>{t('profile.statFollowers')}</Text>
               </Pressable>
               <Pressable onPress={() => setTab('collections')} style={styles.statPress}>
                 <Text style={styles.statValue}>{collections.length}</Text>
-                <Text style={styles.statLabel}>KOLEKSİYON</Text>
+                <Text style={styles.statLabel}>{t('profile.statCollections')}</Text>
               </Pressable>
             </View>
           </View>
@@ -534,7 +539,7 @@ export function UserProfileScreen() {
           {isPrivate ? (
             <View style={styles.privateBadge}>
               <Ionicons name="lock-closed-outline" size={scale(14)} color={colors.textMuted} />
-              <Text style={styles.privateBadgeText}> Gizli profil</Text>
+              <Text style={styles.privateBadgeText}> {t('profile.privateProfile')}</Text>
             </View>
           ) : null}
         </View>
@@ -546,7 +551,7 @@ export function UserProfileScreen() {
               onPress={() => navigation.navigate('EditProfile')}
               style={({ pressed }) => [styles.editBtn, pressed && styles.btnPressed]}
             >
-              <Text style={styles.editBtnText}>Profili düzenle</Text>
+              <Text style={styles.editBtnText}>{t('profile.editProfile')}</Text>
             </Pressable>
             <Pressable
               onPress={createNewCollection}
@@ -558,7 +563,7 @@ export function UserProfileScreen() {
               ) : (
                 <>
                   <Ionicons name="add-circle-outline" size={scale(18)} color={colors.accentPurple} />
-                  <Text style={styles.addCollBtnText}> Koleksiyon</Text>
+                  <Text style={styles.addCollBtnText}> {t('profile.collections')}</Text>
                 </>
               )}
             </Pressable>
@@ -578,7 +583,7 @@ export function UserProfileScreen() {
         )}
 
         <View style={styles.segmentOuter}>
-          {TABS.map(({ key, label }) => (
+          {tabs.map(({ key, label }) => (
             <Pressable
               key={key}
               onPress={() => setTab(key)}
@@ -594,13 +599,13 @@ export function UserProfileScreen() {
         {!canView && !isSelf ? (
           <View style={styles.wall}>
             <Ionicons name="lock-closed" size={scale(48)} color={colors.textMuted} />
-            <Text style={styles.wallTitle}>Bu hesap gizli</Text>
-            <Text style={styles.wallSub}>Gönderileri görmek için takip et veya isteğinin kabul edilmesini bekle.</Text>
+            <Text style={styles.wallTitle}>{t('profile.privateWallTitle')}</Text>
+            <Text style={styles.wallSub}>{t('profile.privateWallSub')}</Text>
           </View>
         ) : tab === 'posts' ? (
           <View style={styles.postsList}>
                 {orderedPosts.length === 0 ? (
-              <Text style={styles.empty}>Henüz gönderi yok.</Text>
+              <Text style={styles.empty}>{t('profile.noPost')}</Text>
             ) : (
                   orderedPosts.map((item, index) => (
                 <PostCard
@@ -611,7 +616,7 @@ export function UserProfileScreen() {
                   authorAvatarStored={item.authorProfileImageUrl ?? profile?.profileImageUrl}
                   category={item.category}
                   excerpt={item.excerpt}
-                  timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs)}
+                  timeLabel={formatRelativeTime(item.createdAtMs ?? item.createdAtClientMs ?? nowMs, appLocaleFromI18n(i18n.language))}
                   showThreadLine={index < orderedPosts.length - 1}
                   onPress={item.category === 'music' ? () => openPost(item) : undefined}
                   onAvatarPress={item.authorUid ? () => navigateToProfile(item.authorUid) : undefined}
@@ -667,7 +672,7 @@ export function UserProfileScreen() {
         ) : tab === 'likes' ? (
           <View style={styles.listBlock}>
             {likes.length === 0 ? (
-              <Text style={styles.empty}>Beğeni yok.</Text>
+              <Text style={styles.empty}>{t('profile.noLikes')}</Text>
             ) : (
               likes.map((item) => (
                 <Pressable
@@ -694,11 +699,11 @@ export function UserProfileScreen() {
                 style={({ pressed }) => [styles.newCollRow, pressed && styles.btnPressed]}
               >
                 <Ionicons name="add-circle-outline" size={scale(22)} color={colors.accentPurple} />
-                <Text style={styles.newCollRowText}> Yeni koleksiyon oluştur</Text>
+                <Text style={styles.newCollRowText}> {t('profile.createCollection')}</Text>
               </Pressable>
             ) : null}
             {collections.length === 0 ? (
-              <Text style={styles.empty}>Koleksiyon yok.</Text>
+              <Text style={styles.empty}>{t('profile.noCollections')}</Text>
             ) : (
               collections.map((c) => (
                 <View key={c.id} style={styles.collectionRowOuter}>
@@ -725,7 +730,7 @@ export function UserProfileScreen() {
                       onPress={() => confirmDeleteCollection(c)}
                       hitSlop={10}
                       style={styles.collectionTrash}
-                      accessibilityLabel="Koleksiyonu sil"
+                      accessibilityLabel={t('collection.delete')}
                     >
                       <Ionicons name="ellipsis-vertical" size={scale(20)} color={colors.textMuted} />
                     </Pressable>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { CachedImage, ScreenSafeArea, StarRating } from '../components';
 import type { AppStackParamList } from '../navigation/types';
 import {
@@ -9,13 +10,14 @@ import {
   subscribeGlobalContentComments,
   type GlobalContentCommentDoc,
 } from '../services/firestoreService';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ItemDetail'>;
 
 export function ItemDetailScreen({ navigation, route }: Props) {
+  const { t, i18n } = useTranslation();
   const { itemType, itemId, title, imageUrl } = route.params;
   const [rows, setRows] = useState<GlobalContentCommentDoc[]>([]);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
@@ -32,8 +34,12 @@ export function ItemDetailScreen({ navigation, route }: Props) {
   }, [itemId, itemType]);
 
   const subtitle = useMemo(
-    () => `${itemType === 'book' ? 'Kitap' : 'Film'} kütüphanesi · ${rows.length} kayıt`,
-    [itemType, rows.length],
+    () =>
+      t('itemDetail.librarySubtitle', {
+        type: itemType === 'book' ? t('collectionType.book') : t('collectionType.film'),
+        count: rows.length,
+      }),
+    [itemType, rows.length, t],
   );
   const coverUri = imageUrl?.trim() || rows.find((x) => x.contentImageUrl?.trim())?.contentImageUrl || undefined;
 
@@ -56,7 +62,7 @@ export function ItemDetailScreen({ navigation, route }: Props) {
               <StarRating rating={catalogRating.averageRating} totalRatings={catalogRating.totalRatings ?? 0} size={scale(12)} />
             </View>
           ) : (
-            <Text style={styles.unrated}>Henüz puanlanmadı</Text>
+            <Text style={styles.unrated}>{t('rating.notRatedYet')}</Text>
           )}
         </View>
       </View>
@@ -64,7 +70,7 @@ export function ItemDetailScreen({ navigation, route }: Props) {
         data={rows}
         keyExtractor={(x) => `${x.postId}_${x.id}`}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>Henüz global yorum yok.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t('itemDetail.noComments')}</Text>}
         renderItem={({ item }) => {
           const avatar = profileImageDisplayUri(item.authorProfileImageUrl);
           return (
@@ -72,10 +78,10 @@ export function ItemDetailScreen({ navigation, route }: Props) {
               {avatar ? <CachedImage uri={avatar} style={styles.avatar} /> : <View style={styles.avatar} />}
               <View style={{ flex: 1 }}>
                 <Text style={styles.author}>{item.authorName}</Text>
-                {item.kind === 'post' ? <Text style={styles.reviewBadge}>Inceleme</Text> : null}
+                {item.kind === 'post' ? <Text style={styles.reviewBadge}>{t('itemDetail.reviewBadge')}</Text> : null}
                 {typeof item.rating === 'number' ? <StarRating rating={item.rating} size={scale(12)} /> : null}
                 <Text style={styles.comment}>{item.text}</Text>
-                <Text style={styles.time}>{formatRelativeTime(item.createdAtMs)}</Text>
+                <Text style={styles.time}>{formatRelativeTime(item.createdAtMs, appLocaleFromI18n(i18n.language))}</Text>
               </View>
             </View>
           );

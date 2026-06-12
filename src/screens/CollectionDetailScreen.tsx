@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { CachedImage, ScreenSafeArea } from '../components';
 import { useAuth } from '../context/AuthContext';
 import type { AppStackParamList } from '../navigation/types';
@@ -14,11 +15,13 @@ import {
   type CollectionItemDoc,
 } from '../services/firestoreService';
 import type { SearchResult } from '../types/searchResult';
+import { getCollectionTypeLabel } from '../utils/collectionLabels';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CollectionDetail'>;
 
 export function CollectionDetailScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const { userId, collectionId, collectionName, collectionType = 'mixed' } = route.params;
   const { user } = useAuth();
   const [items, setItems] = useState<CollectionItemDoc[]>([]);
@@ -60,10 +63,10 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
 
   const onDeleteCollection = () => {
     if (!user?.uid || !isOwner) return;
-    Alert.alert('Koleksiyonu sil', 'Bu koleksiyon ve içindeki öğeler kaldırılacak.', [
-      { text: 'İptal', style: 'cancel' },
+    Alert.alert(t('collection.deleteTitle'), t('collection.deleteWithItemsMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -71,7 +74,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
               await deleteUserCollection(userId, collectionId, user.uid);
               navigation.goBack();
             } catch (e) {
-              Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
             }
           })();
         },
@@ -81,17 +84,17 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
 
   const confirmRemoveItem = (item: CollectionItemDoc) => {
     if (!user?.uid || !isOwner) return;
-    Alert.alert('Öğeyi sil', `"${item.title}" koleksiyondan kaldırılsın mı?`, [
-      { text: 'İptal', style: 'cancel' },
+    Alert.alert(t('collection.removeItemTitle'), t('collection.removeItemMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
             try {
               await removeItemFromCollection(user.uid, collectionId, item.id);
             } catch (e) {
-              Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
             }
           })();
         },
@@ -114,12 +117,12 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
               ? `https://www.themoviedb.org/movie/${r.id.replace(/^tmdb_/, '')}`
               : `https://openlibrary.org/${r.id.replace(/^openlib_/, '').split('__').join('/')}`,
       });
-      if (Platform.OS === 'android') ToastAndroid.show('Başarıyla eklendi', ToastAndroid.SHORT);
-      else Alert.alert('Kaydedildi', 'İçerik koleksiyona eklendi.');
+      if (Platform.OS === 'android') ToastAndroid.show(t('collection.addedToast'), ToastAndroid.SHORT);
+      else Alert.alert(t('collection.saved'));
       setSearchOpen(false);
       setQ('');
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Koleksiyona eklenemedi.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('collection.addFailed'));
     }
   };
 
@@ -133,7 +136,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
           {collectionName}
         </Text>
         {isOwner ? (
-          <Pressable onPress={onDeleteCollection} hitSlop={12} style={styles.trashHit} accessibilityLabel="Koleksiyonu sil">
+          <Pressable onPress={onDeleteCollection} hitSlop={12} style={styles.trashHit} accessibilityLabel={t('collection.delete')}>
             <Ionicons name="trash-outline" size={scale(22)} color={colors.textMuted} />
           </Pressable>
         ) : (
@@ -144,8 +147,8 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
       {items.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="folder-open-outline" size={scale(56)} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>Bu koleksiyon henüz boş</Text>
-          <Text style={styles.emptySub}>İleride eklenen öğeler burada listelenecek.</Text>
+          <Text style={styles.emptyTitle}>{t('collection.emptyTitle')}</Text>
+          <Text style={styles.emptySub}>{t('collection.emptySub')}</Text>
         </View>
       ) : (
         <FlatList
@@ -178,7 +181,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
                   onPress={() => confirmRemoveItem(item)}
                   hitSlop={8}
                   style={styles.deleteHit}
-                  accessibilityLabel="Öğeyi sil"
+                  accessibilityLabel={t('collection.removeItem')}
                 >
                   <Ionicons name="trash-outline" size={scale(18)} color={colors.danger} />
                 </Pressable>
@@ -188,7 +191,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
         />
       )}
       {isOwner ? (
-        <Pressable style={styles.fab} onPress={() => setSearchOpen(true)} accessibilityLabel="İçerik ekle">
+        <Pressable style={styles.fab} onPress={() => setSearchOpen(true)} accessibilityLabel={t('collection.addContent')}>
           <Ionicons name="add" size={scale(26)} color="#fff" />
         </Pressable>
       ) : null}
@@ -196,19 +199,19 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
       <Modal visible={searchOpen} transparent animationType="slide" onRequestClose={() => setSearchOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setSearchOpen(false)} />
         <View style={styles.modalSheet}>
-          <Text style={styles.modalTitle}>Koleksiyona ekle</Text>
+          <Text style={styles.modalTitle}>{t('collection.addToCollection')}</Text>
           <Text style={styles.modalMeta}>
-            Tür: {collectionType === 'film' ? 'Film' : collectionType === 'music' ? 'Müzik' : collectionType === 'book' ? 'Kitap' : 'Karışık'}
+            {t('collection.typeLabel', { type: getCollectionTypeLabel(t, collectionType) })}
           </Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Ara..."
+            placeholder={t('common.search')}
             placeholderTextColor={colors.textMuted}
             value={q}
             onChangeText={setQ}
           />
           <ScrollView>
-            {searching ? <Text style={styles.modalMeta}>Aranıyor...</Text> : null}
+            {searching ? <Text style={styles.modalMeta}>{t('common.searching')}</Text> : null}
             {rows.map((r) => (
               <Pressable key={r.id} style={styles.searchRow} onPress={() => void onAdd(r)}>
                 {r.imageUrl ? <CachedImage uri={r.imageUrl} style={styles.searchThumb} /> : <View style={styles.searchThumb} />}

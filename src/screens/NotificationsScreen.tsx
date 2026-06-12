@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { ScreenSafeArea } from '../components';
 import { isFirebaseConfigured } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +33,7 @@ import {
 const edges = ['top', 'left', 'right', 'bottom'] as const;
 
 export function NotificationsScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [items, setItems] = useState<NotificationDoc[]>([]);
   const isFocused = useIsFocused();
@@ -49,7 +51,7 @@ export function NotificationsScreen() {
         if (latest && AppState.currentState !== 'active' && !isExpoGoRuntime) {
           void scheduleLocalNotification({
             title: 'Synestia',
-            body: labelFor(latest),
+            body: labelFor(latest, t),
             sound: true,
           });
         }
@@ -57,7 +59,7 @@ export function NotificationsScreen() {
       prevCountRef.current = unread.length;
       setItems(newItems);
     });
-  }, [user?.uid]);
+  }, [user?.uid, t]);
 
   useEffect(() => {
     if (isFocused && user?.uid && isFirebaseConfigured()) {
@@ -70,7 +72,7 @@ export function NotificationsScreen() {
   }, []);
 
   const displayName =
-    user?.displayName || user?.email?.split('@')[0] || 'Kullanıcı';
+    user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
   const onAccept = useCallback(
     async (fromUid: string) => {
@@ -78,10 +80,10 @@ export function NotificationsScreen() {
       try {
         await acceptFollowRequest(user.uid, fromUid, displayName);
       } catch (e) {
-        Alert.alert('Hata', e instanceof Error ? e.message : 'Kabul edilemedi.');
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : t('notifications.acceptFailed'));
       }
     },
-    [displayName, user?.uid],
+    [displayName, user?.uid, t],
   );
 
   const onReject = useCallback(
@@ -90,10 +92,10 @@ export function NotificationsScreen() {
       try {
         await rejectFollowRequest(user.uid, fromUid);
       } catch (e) {
-        Alert.alert('Hata', e instanceof Error ? e.message : 'Reddedilemedi.');
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : t('notifications.rejectFailed'));
       }
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   const onDelete = useCallback(
@@ -102,17 +104,17 @@ export function NotificationsScreen() {
       try {
         await deleteNotification(user.uid, id);
       } catch (e) {
-        Alert.alert('Hata', e instanceof Error ? e.message : 'Bildirim silinemedi.');
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : t('notifications.deleteFailed'));
       }
     },
-    [user?.uid],
+    [user?.uid, t],
   );
 
   if (!isFirebaseConfigured() || !user?.uid) {
     return (
       <ScreenSafeArea edges={edges}>
         <View style={styles.center}>
-          <Text style={styles.empty}>Bildirimler için giriş yapın ve Firebase kullanın.</Text>
+          <Text style={styles.empty}>{t('notifications.loginRequired')}</Text>
         </View>
       </ScreenSafeArea>
     );
@@ -125,13 +127,13 @@ export function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={items.length === 0 ? styles.centerGrow : styles.listPad}
         ListEmptyComponent={
-          <Text style={styles.empty}>Henüz bildiriminiz yok</Text>
+          <Text style={styles.empty}>{t('notifications.noNotifications')}</Text>
         }
         renderItem={({ item }) => (
           <View style={[styles.card, !item.read && styles.cardUnread]}>
             <View style={styles.cardTop}>
-              <Text style={styles.cardText}>{labelFor(item)}</Text>
-              <Pressable onPress={() => void onDelete(item.id)} hitSlop={8} accessibilityLabel="Bildirimi sil">
+              <Text style={styles.cardText}>{labelFor(item, t)}</Text>
+              <Pressable onPress={() => void onDelete(item.id)} hitSlop={8} accessibilityLabel={t('notifications.delete')}>
                 <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
               </Pressable>
             </View>
@@ -141,13 +143,13 @@ export function NotificationsScreen() {
                   style={[styles.btn, styles.btnAccept]}
                   onPress={() => void onAccept(item.fromUid)}
                 >
-                  <Text style={styles.btnAcceptText}>Kabul et</Text>
+                  <Text style={styles.btnAcceptText}>{t('notifications.accept')}</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.btn, styles.btnReject]}
                   onPress={() => void onReject(item.fromUid)}
                 >
-                  <Text style={styles.btnRejectText}>Reddet</Text>
+                  <Text style={styles.btnRejectText}>{t('notifications.reject')}</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -158,18 +160,22 @@ export function NotificationsScreen() {
   );
 }
 
-function labelFor(n: NotificationDoc) {
+function labelFor(n: NotificationDoc, t: (key: string, opts?: Record<string, unknown>) => string) {
   switch (n.type) {
     case 'follow_request':
-      return `${n.fromDisplayName} sizi takip etmek istiyor`;
+      return t('notifications.followRequestBody', { name: n.fromDisplayName });
     case 'new_follower':
-      return `${n.fromDisplayName} sizi takip etmeye başladı`;
+      return t('notifications.newFollowerBody', { name: n.fromDisplayName });
     case 'like':
-      return `${n.fromDisplayName} gönderinizi beğendi${n.postTitle ? `: ${n.postTitle}` : ''}`;
+      return n.postTitle
+        ? `${t('notifications.likeBody', { name: n.fromDisplayName })}: ${n.postTitle}`
+        : t('notifications.likeBody', { name: n.fromDisplayName });
     case 'comment':
-      return `${n.fromDisplayName} yorum yaptı${n.postTitle ? `: ${n.postTitle}` : ''}`;
+      return n.postTitle
+        ? `${t('notifications.commentBody', { name: n.fromDisplayName })}: ${n.postTitle}`
+        : t('notifications.commentBody', { name: n.fromDisplayName });
     default:
-      return 'Bildirim';
+      return t('notifications.generic');
   }
 }
 

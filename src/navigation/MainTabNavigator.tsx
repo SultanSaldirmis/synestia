@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import type { MainTabParamList } from './types';
@@ -51,6 +52,7 @@ const badgeStyles = StyleSheet.create({
 });
 
 export function MainTabNavigator() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -89,7 +91,7 @@ export function MainTabNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: 'Akış',
+          title: t('tabs.feed'),
           tabBarIcon: ({ color }) => (
             <Ionicons name="home" size={ICON_SIZE} color={color} />
           ),
@@ -99,7 +101,7 @@ export function MainTabNavigator() {
         name="Explore"
         component={ExploreScreen}
         options={{
-          title: 'Keşfet',
+          title: t('tabs.explore'),
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="compass-outline" size={ICON_SIZE} color={color} />
           ),
@@ -109,7 +111,7 @@ export function MainTabNavigator() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Profil',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color }) => (
             <FontAwesome name="user-circle-o" size={ICON_SIZE} color={color} />
           ),
@@ -119,7 +121,7 @@ export function MainTabNavigator() {
         name="Notifications"
         component={NotificationsScreen}
         options={{
-          title: 'Bildirimler',
+          title: t('tabs.notifications'),
           tabBarIcon: ({ color, focused }) => (
             <View>
               <Ionicons

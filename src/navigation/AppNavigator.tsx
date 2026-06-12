@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import type { AppStackParamList } from './types';
 import { MainTabNavigator } from './MainTabNavigator';
 import { CreatePostScreen } from '../screens/CreatePostScreen';
@@ -44,7 +45,9 @@ function NavigationBridge({ setNavigationRef }: Props) {
   return null;
 }
 
-export function AppNavigator({ setNavigationRef }: Props) {
+function AppStackNavigator({ setNavigationRef }: Props) {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -87,16 +90,16 @@ export function AppNavigator({ setNavigationRef }: Props) {
         options={({ route }) => ({
           title:
             route.params.mode === 'followers'
-              ? 'Takipçiler'
+              ? t('follow.followersTitle')
               : route.params.mode === 'following'
-                ? 'Takip edilenler'
-                : 'Koleksiyonlar',
+                ? t('follow.followingTitle')
+                : t('profile.collections'),
         })}
       />
       <Stack.Screen
         name="CreatePost"
         component={CreatePostScreen}
-        options={{ title: 'Gönderi oluştur' }}
+        options={{ title: t('post.createTitle') }}
       />
       <Stack.Screen
         name="UserProfile"
@@ -121,18 +124,22 @@ export function AppNavigator({ setNavigationRef }: Props) {
       <Stack.Screen
         name="CrudTest"
         component={CrudTestScreen}
-        options={{ title: 'CRUD Test' }}
+        options={{ title: t('crudTest.title') }}
       />
       <Stack.Screen
         name="MapPicker"
         component={MapPickerScreen}
-        options={{ title: 'Konum Seç' }}
+        options={{ title: t('map.title') }}
       />
       <Stack.Screen
         name="CameraLocation"
         component={CameraLocationScreen}
-        options={{ title: 'Anı Kaydet', headerShown: false }}
+        options={{ title: t('camera.title'), headerShown: false }}
       />
     </Stack.Navigator>
   );
+}
+
+export function AppNavigator(props: Props) {
+  return <AppStackNavigator {...props} />;
 }

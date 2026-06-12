@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { CachedImage, StarRating } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
@@ -75,6 +76,7 @@ function searchResultToAttached(sr: SearchResult): AttachedContent {
 }
 
 export function CreatePostScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { user, firebaseConfigured } = useAuth();
   const [step, setStep] = useState<WizardStep>(1);
   const [kind, setKind] = useState<PickKind | null>(null);
@@ -161,20 +163,20 @@ export function CreatePostScreen({ navigation }: Props) {
   const publish = useCallback(async () => {
     if (savingRef.current) return;
     if (!user?.uid) {
-      Alert.alert('Oturum', 'Gönderi için giriş yapın.');
+      Alert.alert(t('post.loginRequired'), t('post.loginRequiredCreate'));
       return;
     }
     if (!firebaseConfigured) {
-      Alert.alert('Firebase', 'Yapılandırma eksik.');
+      Alert.alert(t('common.error'), t('common.firebaseMissing'));
       return;
     }
     if (!selected) {
-      Alert.alert('İçerik', 'Önce bir içerik seçin.');
+      Alert.alert(t('post.selectContent'), t('post.selectContentStep'));
       return;
     }
     const body = text.trim();
     if (!body) {
-      Alert.alert('Metin', 'Gönderinize bir not ekleyin.');
+      Alert.alert(t('post.thoughtsLabel'), t('post.addNote'));
       return;
     }
     savingRef.current = true;
@@ -182,7 +184,7 @@ export function CreatePostScreen({ navigation }: Props) {
     try {
       const profile = await getUserProfileOnce(user.uid);
       const displayName =
-        profile?.displayName || user.displayName || user.email?.split('@')[0] || 'Kullanıcı';
+        profile?.displayName || user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
       const attachedRaw = searchResultToAttached(selected);
       const attached = sanitizeData({
         ...attachedRaw,
@@ -206,12 +208,12 @@ export function CreatePostScreen({ navigation }: Props) {
       Keyboard.dismiss();
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Hata', e instanceof Error ? e.message : 'Kaydedilemedi.');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.publishFailed'));
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [firebaseConfigured, navigation, rating, selected, text, user]);
+  }, [firebaseConfigured, navigation, rating, selected, text, user, t]);
 
   const attachedPreview = selected ? searchResultToAttached(selected) : null;
 
@@ -225,17 +227,17 @@ export function CreatePostScreen({ navigation }: Props) {
       <View style={{ flex: 1 }}>
       <View style={styles.header}>
         <Pressable onPress={goBackStep} hitSlop={12}>
-          <Text style={styles.headerLink}>{step === 1 ? 'İptal' : 'Geri'}</Text>
+          <Text style={styles.headerLink}>{step === 1 ? t('common.cancel') : t('common.back')}</Text>
         </Pressable>
         <Text style={styles.headerTitle}>
-          {step === 1 ? 'Gönderi oluştur' : step === 2 ? 'İçerik seç' : 'Notunu yaz'}
+          {step === 1 ? t('post.createTitle') : step === 2 ? t('post.selectContentStep') : t('post.writeNoteStep')}
         </Text>
         {step === 3 ? (
           <Pressable onPress={() => void publish()} disabled={saving} hitSlop={12}>
             {saving ? (
               <ActivityIndicator color={colors.accentPurple} size="small" />
             ) : (
-              <Text style={styles.headerDone}>Paylaş</Text>
+              <Text style={styles.headerDone}>{t('post.share')}</Text>
             )}
           </Pressable>
         ) : (
@@ -245,19 +247,19 @@ export function CreatePostScreen({ navigation }: Props) {
 
       {step === 1 ? (
         <View style={styles.stepBlock}>
-          <Text style={styles.question}>Ne hakkında paylaşmak istersin?</Text>
+          <Text style={styles.question}>{t('post.whatToShare')}</Text>
           <View style={styles.typeGrid}>
             <Pressable style={({ pressed }) => [styles.typeCard, pressed && styles.typeCardPressed]} onPress={() => pickKind('music')}>
               <Ionicons name="musical-notes" size={scale(36)} color={colors.accentPurple} />
-              <Text style={styles.typeLabel}>Müzik</Text>
+              <Text style={styles.typeLabel}>{t('post.category.music')}</Text>
             </Pressable>
             <Pressable style={({ pressed }) => [styles.typeCard, pressed && styles.typeCardPressed]} onPress={() => pickKind('movie')}>
               <Ionicons name="film-outline" size={scale(36)} color={colors.accentLavender} />
-              <Text style={styles.typeLabel}>Film</Text>
+              <Text style={styles.typeLabel}>{t('post.category.movie')}</Text>
             </Pressable>
             <Pressable style={({ pressed }) => [styles.typeCard, pressed && styles.typeCardPressed]} onPress={() => pickKind('book')}>
               <Ionicons name="book-outline" size={scale(36)} color={colors.tabActive} />
-              <Text style={styles.typeLabel}>Kitap</Text>
+              <Text style={styles.typeLabel}>{t('post.category.book')}</Text>
             </Pressable>
           </View>
         </View>
@@ -268,7 +270,7 @@ export function CreatePostScreen({ navigation }: Props) {
           <TextInput
             style={styles.searchInput}
             placeholder={
-              kind === 'music' ? 'Şarkı veya sanatçı ara…' : kind === 'movie' ? 'Film ara…' : 'Kitap ara…'
+              kind === 'music' ? t('post.searchMusic') : kind === 'movie' ? t('post.searchMovie') : t('post.searchBook')
             }
             placeholderTextColor={colors.textMuted}
             value={searchQ}
@@ -288,7 +290,7 @@ export function CreatePostScreen({ navigation }: Props) {
             contentContainerStyle={styles.listPad}
             ListEmptyComponent={
               searchQ.trim().length >= 2 && !searching ? (
-                <Text style={styles.emptySearch}>Sonuç yok — farklı anahtar kelime deneyin.</Text>
+                <Text style={styles.emptySearch}>{t('post.noSearchResults')}</Text>
               ) : null
             }
             renderItem={({ item }) => (
@@ -325,16 +327,16 @@ export function CreatePostScreen({ navigation }: Props) {
               <CachedImage uri={NO_SEARCH_IMAGE_URI} style={styles.selectedThumb} />
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.selectedMeta}>Seçilen içerik</Text>
+              <Text style={styles.selectedMeta}>{t('post.selectedContent')}</Text>
               <Text style={styles.selectedTitle} numberOfLines={2}>
                 {attachedPreview.title}
               </Text>
             </View>
           </View>
-          <Text style={styles.composeLabel}>Düşüncelerin</Text>
+          <Text style={styles.composeLabel}>{t('post.thoughtsLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Bu içerik hakkında ne düşünüyorsun?"
+            placeholder={t('post.thoughtsPlaceholder')}
             placeholderTextColor={colors.textMuted}
             value={text}
             onChangeText={setText}
@@ -346,11 +348,11 @@ export function CreatePostScreen({ navigation }: Props) {
           />
           {(selected?.type === 'book' || selected?.type === 'movie') ? (
             <View style={styles.ratingWrap}>
-              <Text style={styles.composeLabel}>Yıldız puanı</Text>
+              <Text style={styles.composeLabel}>{t('post.starRating')}</Text>
               <StarRating rating={rating} onRate={setRating} />
             </View>
           ) : null}
-          <Text style={styles.hint}>Gönderin herkese açık akış kurallarına tabidir.</Text>
+          <Text style={styles.hint}>{t('post.publicFeedHint')}</Text>
         </View>
       ) : null}
       </View>

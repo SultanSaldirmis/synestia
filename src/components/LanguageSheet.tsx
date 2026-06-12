@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { useAppDispatch } from '../store/hooks';
 import { setLanguage } from '../store/uiSlice';
@@ -32,8 +33,9 @@ export function LanguageSheet() {
   }
 
   async function select(lang: 'tr' | 'en') {
-    await i18n.changeLanguage(lang);
     dispatch(setLanguage(lang));
+    await i18n.changeLanguage(lang);
+    dayjs.locale(lang === 'en' ? 'en' : 'tr');
     setVisible(false);
   }
 

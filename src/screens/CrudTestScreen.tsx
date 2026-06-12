@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { ScreenSafeArea } from '../components';
 import type { AppStackParamList } from '../navigation/types';
 import {
@@ -27,6 +28,7 @@ import { colors, radii, spacing, spacingVertical, typography } from '../theme';
 type Props = NativeStackScreenProps<AppStackParamList, 'CrudTest'>;
 
 export function CrudTestScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<MockPost[]>([]);
   const [busy, setBusy] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -41,14 +43,14 @@ export function CrudTestScreen({ navigation }: Props) {
       setRows(await listMockPosts());
     } catch (e) {
       if (isMockApiConnectionError(e)) {
-        setInlineError('Mock API bağlantısı kurulamadı, lütfen internetinizi kontrol edin.');
+        setInlineError(t('crudTest.connectionError'));
       } else {
-        Alert.alert('Hata', 'Liste yüklenemedi.');
+        Alert.alert(t('common.error'), t('crudTest.loadFailed'));
       }
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -61,17 +63,17 @@ export function CrudTestScreen({ navigation }: Props) {
   };
 
   const showSuccessToast = () => {
-    const message = "Veri MockAPI'ye başarıyla yazıldı.";
+    const message = t('crudTest.writeSuccess');
     if (Platform.OS === 'android') {
       ToastAndroid.show(message, ToastAndroid.SHORT);
     } else {
-      Alert.alert('Başarılı', message);
+      Alert.alert(t('common.success'), message);
     }
   };
 
   const onSubmit = async () => {
     if (!title.trim() || !content.trim()) {
-      Alert.alert('Eksik bilgi', 'Başlık ve içerik zorunludur.');
+      Alert.alert(t('common.error'), t('crudTest.requiredFields'));
       return;
     }
     setBusy(true);
@@ -92,9 +94,9 @@ export function CrudTestScreen({ navigation }: Props) {
       clearForm();
     } catch (e) {
       if (isMockApiConnectionError(e)) {
-        setInlineError('Mock API bağlantısı kurulamadı, lütfen internetinizi kontrol edin.');
+        setInlineError(t('crudTest.connectionError'));
       } else {
-        Alert.alert('Hata', e instanceof Error ? e.message : 'İşlem başarısız.');
+        Alert.alert(t('common.error'), e instanceof Error ? e.message : t('common.actionFailed'));
       }
     } finally {
       setBusy(false);
@@ -108,10 +110,10 @@ export function CrudTestScreen({ navigation }: Props) {
   };
 
   const onDelete = (id: string) => {
-    Alert.alert('Kaydı sil', 'Bu kayıt silinecek.', [
-      { text: 'İptal', style: 'cancel' },
+    Alert.alert(t('crudTest.deleteTitle'), t('crudTest.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -123,9 +125,9 @@ export function CrudTestScreen({ navigation }: Props) {
               showSuccessToast();
             } catch (e) {
               if (isMockApiConnectionError(e)) {
-                setInlineError('Mock API bağlantısı kurulamadı, lütfen internetinizi kontrol edin.');
+                setInlineError(t('crudTest.connectionError'));
               } else {
-                Alert.alert('Hata', 'Silinemedi.');
+                Alert.alert(t('common.error'), t('crudTest.deleteFailed'));
               }
             } finally {
               setBusy(false);
@@ -141,9 +143,9 @@ export function CrudTestScreen({ navigation }: Props) {
       <View style={styles.wrap}>
         <View style={styles.top}>
           <Pressable onPress={() => navigation.goBack()}>
-            <Text style={styles.back}>Geri</Text>
+            <Text style={styles.back}>{t('common.back')}</Text>
           </Pressable>
-          <Text style={styles.title}>Mock API Post Paylaşımı</Text>
+          <Text style={styles.title}>{t('crudTest.title')}</Text>
           <View style={{ width: 32 }} />
         </View>
         {inlineError ? <Text style={styles.inlineError}>{inlineError}</Text> : null}
@@ -151,24 +153,24 @@ export function CrudTestScreen({ navigation }: Props) {
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Başlık"
+          placeholder={t('crudTest.titlePlaceholder')}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
         />
         <TextInput
           value={content}
           onChangeText={setContent}
-          placeholder="İçerik"
+          placeholder={t('crudTest.contentPlaceholder')}
           placeholderTextColor={colors.textMuted}
           style={[styles.input, styles.inputMulti]}
           multiline
         />
         <View style={styles.row}>
           <Pressable style={styles.primary} onPress={() => void onSubmit()} disabled={busy}>
-            <Text style={styles.primaryTxt}>{editingId ? 'Postu Güncelle' : 'Paylaş'}</Text>
+            <Text style={styles.primaryTxt}>{editingId ? t('crudTest.updatePost') : t('post.share')}</Text>
           </Pressable>
           <Pressable style={styles.secondary} onPress={() => void load()} disabled={busy}>
-            <Text style={styles.secondaryTxt}>Listeyi Yenile</Text>
+            <Text style={styles.secondaryTxt}>{t('crudTest.refreshList')}</Text>
           </Pressable>
         </View>
 
@@ -181,14 +183,14 @@ export function CrudTestScreen({ navigation }: Props) {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>{new Date(item.createdAt).toLocaleString('tr-TR')}</Text>
+              <Text style={styles.cardMeta}>{new Date(item.createdAt).toLocaleString()}</Text>
               <Text style={styles.cardContent}>{item.content}</Text>
               <View style={styles.actions}>
                 <Pressable onPress={() => onEdit(item)}>
-                  <Text style={styles.edit}>PUT Düzenle</Text>
+                  <Text style={styles.edit}>{t('crudTest.putEdit')}</Text>
                 </Pressable>
                 <Pressable onPress={() => onDelete(item.id)}>
-                  <Text style={styles.delete}>DELETE Sil</Text>
+                  <Text style={styles.delete}>{t('crudTest.deleteAction')}</Text>
                 </Pressable>
               </View>
             </View>

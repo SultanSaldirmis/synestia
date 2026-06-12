@@ -17,6 +17,7 @@ import {
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { CachedImage, ScreenSafeArea, StarRating } from '../components';
 import { isFirebaseConfigured } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +45,7 @@ type Nav = NativeStackNavigationProp<AppStackParamList>;
 export function DetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<DetailRoute>();
+  const { t } = useTranslation();
   const {
     title,
     category,
@@ -74,7 +76,7 @@ export function DetailScreen() {
   const normalizedBody = detailText.trim();
   const showTagline = Boolean(normalizedDescription && normalizedDescription !== normalizedBody);
 
-  const actorName = user?.displayName || user?.email?.split('@')[0] || 'Kullanıcı';
+  const actorName = user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
   useEffect(() => {
     if (!user?.uid || !firebaseConfigured) {
@@ -130,7 +132,7 @@ export function DetailScreen() {
 
   const onToggleLike = useCallback(async () => {
     if (!user?.uid) {
-      Alert.alert('Oturum', 'Beğenmek için giriş yapın.');
+      Alert.alert(t('post.loginRequired'), t('post.loginRequiredLike'));
       return;
     }
     try {
@@ -145,18 +147,18 @@ export function DetailScreen() {
       });
       setLiked(next);
     } catch {
-      Alert.alert('Hata', 'Beğeni kaydedilemedi.');
+      Alert.alert(t('common.error'), t('post.likeFailed'));
     }
-  }, [actorName, body, category, description, id, imageUrl, postAuthorUid, routeAuthorName, title, user?.uid]);
+  }, [actorName, body, category, description, id, imageUrl, postAuthorUid, routeAuthorName, title, user?.uid, t]);
 
   const sendComment = useCallback(async () => {
     if (commentSubmittingRef.current) return;
     if (!user?.uid) {
-      Alert.alert('Oturum', 'Yorum için giriş yapın.');
+      Alert.alert(t('post.loginRequired'), t('post.loginRequiredComment'));
       return;
     }
-    const t = commentText.trim();
-    if (!t) return;
+    const text = commentText.trim();
+    if (!text) return;
     commentSubmittingRef.current = true;
     setCommentSubmitting(true);
     try {
@@ -165,7 +167,7 @@ export function DetailScreen() {
         id,
         user.uid,
         actorName,
-        t,
+        text,
         postAuthorUid,
         title,
         profile?.profileImageUrl,
@@ -174,12 +176,12 @@ export function DetailScreen() {
       setCommentText('');
       setReplyTo(null);
     } catch {
-      Alert.alert('Hata', 'Yorum gönderilemedi.');
+      Alert.alert(t('common.error'), t('post.commentFailed'));
     } finally {
       commentSubmittingRef.current = false;
       setCommentSubmitting(false);
     }
-  }, [actorName, commentText, id, postAuthorUid, replyTo, title, user?.uid]);
+  }, [actorName, commentText, id, postAuthorUid, replyTo, title, user?.uid, t]);
 
   const onShareDetail = useCallback(() => {
     void Share.share({
@@ -189,10 +191,10 @@ export function DetailScreen() {
 
   const onDeletePost = useCallback(() => {
     if (!user?.uid || !canDeletePost) return;
-    Alert.alert('Gönderiyi sil', 'Bu işlem geri alınamaz.', [
-      { text: 'İptal', style: 'cancel' },
+    Alert.alert(t('post.deleteTitle'), t('post.deleteMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sil',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -200,35 +202,35 @@ export function DetailScreen() {
               await deletePost(id, user.uid);
               navigation.goBack();
             } catch (e) {
-              Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
             }
           })();
         },
       },
     ]);
-  }, [canDeletePost, id, navigation, user?.uid]);
+  }, [canDeletePost, id, navigation, user?.uid, t]);
 
   const onDeleteComment = useCallback(
     (c: PostCommentDoc) => {
       if (!user?.uid || c.authorUid !== user.uid) return;
-      Alert.alert('Yorumu sil', 'Bu yorum kaldırılacak.', [
-        { text: 'İptal', style: 'cancel' },
+      Alert.alert(t('post.deleteCommentTitle'), t('post.deleteCommentMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sil',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
                 await deletePostComment(id, c.id, user.uid);
               } catch (e) {
-                Alert.alert('Hata', e instanceof Error ? e.message : 'Silinemedi.');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('post.deleteFailed'));
               }
             })();
           },
         },
       ]);
     },
-    [id, user?.uid],
+    [id, user?.uid, t],
   );
 
   const navigateToProfile = useCallback(
@@ -276,11 +278,11 @@ export function DetailScreen() {
                     }}
                     hitSlop={8}
                   >
-                    <Text style={styles.replyBtn}>Yanıtla</Text>
+                    <Text style={styles.replyBtn}>{t('post.reply')}</Text>
                   </Pressable>
                 ) : null}
                 {user?.uid === c.authorUid ? (
-                  <Pressable onPress={() => onDeleteComment(c)} hitSlop={8} accessibilityLabel="Yorumu sil">
+                  <Pressable onPress={() => onDeleteComment(c)} hitSlop={8} accessibilityLabel={t('post.deleteComment')}>
                     <Ionicons name="trash-outline" size={scale(16)} color={colors.textMuted} />
                   </Pressable>
                 ) : null}
@@ -330,7 +332,7 @@ export function DetailScreen() {
               <View style={{ flex: 1 }} />
             )}
             {canDeletePost ? (
-              <Pressable onPress={onDeletePost} hitSlop={10} accessibilityLabel="Gönderiyi sil">
+              <Pressable onPress={onDeletePost} hitSlop={10} accessibilityLabel={t('post.deleteTitle')}>
                 <Ionicons name="trash-outline" size={scale(22)} color={colors.textMuted} />
               </Pressable>
             ) : null}
@@ -344,7 +346,7 @@ export function DetailScreen() {
                   totalRatings={catalogRating.totalRatings ?? 0}
                 />
               ) : (
-                <Text style={styles.unratedText}>Henüz puanlanmadı</Text>
+                <Text style={styles.unratedText}>{t('rating.notRatedYet')}</Text>
               )}
             </View>
           ) : null}
@@ -363,19 +365,19 @@ export function DetailScreen() {
               />
               <Text style={styles.iconActionCount}>{likesCountLive}</Text>
             </Pressable>
-            <Pressable onPress={onShareDetail} style={styles.iconAction} accessibilityLabel="Paylaş">
+            <Pressable onPress={onShareDetail} style={styles.iconAction} accessibilityLabel={t('post.share')}>
               <Ionicons name="share-outline" size={scale(22)} color={colors.textMuted} />
             </Pressable>
           </View>
 
-          <Text style={styles.commentHead}>{commentCount} Yorum</Text>
+          <Text style={styles.commentHead}>{t('post.commentCount', { count: commentCount })}</Text>
 
           {firebaseConfigured && user?.uid ? (
             <View style={styles.commentBox}>
               {replyTo ? (
                 <View style={styles.replyIndicator}>
                   <Text style={styles.replyIndicatorText} numberOfLines={1}>
-                    {replyTo.authorName} adlı kullanıcıya yanıt
+                    {t('post.replyingTo', { name: replyTo.authorName })}
                   </Text>
                   <Pressable onPress={() => { setReplyTo(null); setCommentText(''); }} hitSlop={8}>
                     <Ionicons name="close-circle" size={scale(18)} color={colors.textMuted} />
@@ -385,7 +387,7 @@ export function DetailScreen() {
               <View style={styles.commentInputRow}>
                 <TextInput
                   style={styles.commentInput}
-                  placeholder={replyTo ? 'Yanıtınızı yazın…' : 'Yorumunuzu yazın…'}
+                  placeholder={replyTo ? t('post.replyPlaceholder') : t('post.commentPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   value={commentText}
                   onChangeText={setCommentText}
