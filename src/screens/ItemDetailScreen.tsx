@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { CachedImage, ScreenSafeArea, StarRating } from '../components';
+import { useAuth } from '../context/AuthContext';
 import type { AppStackParamList } from '../navigation/types';
 import {
   getCatalogRatingsByRefs,
@@ -18,6 +19,7 @@ type Props = NativeStackScreenProps<AppStackParamList, 'ItemDetail'>;
 
 export function ItemDetailScreen({ navigation, route }: Props) {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const { itemType, itemId, title, imageUrl } = route.params;
   const [rows, setRows] = useState<GlobalContentCommentDoc[]>([]);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
@@ -42,6 +44,17 @@ export function ItemDetailScreen({ navigation, route }: Props) {
     [itemType, rows.length, t],
   );
   const coverUri = imageUrl?.trim() || rows.find((x) => x.contentImageUrl?.trim())?.contentImageUrl || undefined;
+
+  const navigateToProfile = useCallback(
+    (uid: string) => {
+      if (uid === user?.uid) {
+        navigation.navigate('MainTabs', { screen: 'Profile' });
+      } else {
+        navigation.navigate('UserProfile', { userId: uid });
+      }
+    },
+    [navigation, user?.uid],
+  );
 
   return (
     <ScreenSafeArea edges={['top', 'left', 'right', 'bottom']}>
@@ -75,14 +88,20 @@ export function ItemDetailScreen({ navigation, route }: Props) {
           const avatar = profileImageDisplayUri(item.authorProfileImageUrl);
           return (
             <View style={styles.row}>
-              {avatar ? <CachedImage uri={avatar} style={styles.avatar} /> : <View style={styles.avatar} />}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.author}>{item.authorName}</Text>
-                {item.kind === 'post' ? <Text style={styles.reviewBadge}>{t('itemDetail.reviewBadge')}</Text> : null}
-                {typeof item.rating === 'number' ? <StarRating rating={item.rating} size={scale(12)} /> : null}
-                <Text style={styles.comment}>{item.text}</Text>
-                <Text style={styles.time}>{formatRelativeTime(item.createdAtMs, appLocaleFromI18n(i18n.language))}</Text>
-              </View>
+              <Pressable
+                onPress={() => item.authorUid && navigateToProfile(item.authorUid)}
+                disabled={!item.authorUid}
+                style={({ pressed }) => [styles.authorPressable, pressed && item.authorUid && styles.authorPressed]}
+              >
+                {avatar ? <CachedImage uri={avatar} style={styles.avatar} /> : <View style={styles.avatar} />}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.author}>{item.authorName}</Text>
+                  {item.kind === 'post' ? <Text style={styles.reviewBadge}>{t('itemDetail.reviewBadge')}</Text> : null}
+                  {typeof item.rating === 'number' ? <StarRating rating={item.rating} size={scale(12)} /> : null}
+                  <Text style={styles.comment}>{item.text}</Text>
+                  <Text style={styles.time}>{formatRelativeTime(item.createdAtMs, appLocaleFromI18n(i18n.language))}</Text>
+                </View>
+              </Pressable>
             </View>
           );
         }}
@@ -111,6 +130,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacingVertical.sm,
   },
+  authorPressable: { flex: 1, flexDirection: 'row', gap: spacing.sm },
+  authorPressed: { opacity: 0.88 },
   avatar: { width: scale(34), height: scale(34), borderRadius: scale(17), backgroundColor: colors.surfaceElevated },
   author: { ...typography.body, color: colors.textPrimary, fontWeight: '700' },
   reviewBadge: { ...typography.caption, color: colors.accentPurple, marginTop: spacingVertical.xxs },

@@ -30,6 +30,10 @@ import type { PostCategory } from '../components';
 import type { AttachedContent, FeedPost } from '../data/mockData';
 import { sanitizeData } from '../utils/firebaseUtils';
 import { getFirebaseApp } from './firebaseApp';
+import {
+  LEGACY_MOMENTS_COLLECTION_NAMES,
+  MOMENTS_COLLECTION_CANONICAL_NAME,
+} from '../constants/momentsCollection';
 
 const PLACEHOLDER_IMAGE =
   'https://picsum.photos/seed/synestia-text/800/400';
@@ -198,6 +202,17 @@ function mapPost(id: string, data: Record<string, unknown>): FeedPost | null {
   const atMs = createdAtMillis(data);
   const clientMs = typeof data.createdAtClientMs === 'number' ? data.createdAtClientMs : undefined;
   const attached = mapAttachedContent(data.attachedContent);
+  const loc = data.location;
+  const location =
+    loc &&
+    typeof loc === 'object' &&
+    typeof (loc as { latitude?: unknown }).latitude === 'number' &&
+    typeof (loc as { longitude?: unknown }).longitude === 'number'
+      ? {
+          latitude: (loc as { latitude: number }).latitude,
+          longitude: (loc as { longitude: number }).longitude,
+        }
+      : undefined;
   return {
     id,
     title: String(data.title ?? ''),
@@ -214,6 +229,7 @@ function mapPost(id: string, data: Record<string, unknown>): FeedPost | null {
     createdAtMs: atMs > 0 ? atMs : undefined,
     createdAtClientMs: clientMs && clientMs > 0 ? clientMs : undefined,
     attachedContent: attached,
+    location,
   };
 }
 
@@ -232,6 +248,22 @@ async function deleteAllDocsInCollection(db: Firestore, segments: [string, ...st
     if (snap.empty) break;
     const batch = writeBatch(db);
     snap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+/** Post beğenilerini ve kullanıcı profilindeki beğeni aynalarını siler. */
+async function deletePostLikesAndMirrors(db: Firestore, postId: string): Promise<void> {
+  const likesCol = collection(db, 'posts', postId, 'likes');
+  for (;;) {
+    const snap = await getDocs(query(likesCol, limit(200)));
+    if (snap.empty) break;
+    const batch = writeBatch(db);
+    snap.forEach((d) => {
+      const likerUid = d.id;
+      batch.delete(doc(db, 'users', likerUid, 'likes', postId));
+      batch.delete(d.ref);
+    });
     await batch.commit();
   }
 }
@@ -451,11 +483,10 @@ export async function createFeedPost(
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase yapılandırılmadı.');
   const body = text.trim();
-  if (!body) throw new Error('Metin boş olamaz.');
+  const hasAttached = Boolean(attachedContent?.title && attachedContent.type);
+  if (!body && !hasAttached) throw new Error('Metin boş olamaz.');
   const db = getFirestore(app);
   const ref = doc(collection(db, 'posts'));
-
-  const hasAttached = Boolean(attachedContent?.title && attachedContent.type);
   const category: PostCategory = hasAttached && attachedContent
     ? attachedToCategory(attachedContent.type)
     : 'text';
@@ -504,7 +535,7 @@ export async function createTextPost(
   return createFeedPost(uid, profile, text, null);
 }
 
-/** Fotoğraf + konum + metin içeren anı gönderisi oluşturur. */
+/** Fotoğraf ve/veya konum + metin içeren anı gönderisi oluşturur. */
 export async function createMomentPost(
   uid: string,
   profile: { displayName: string; profileImageUrl?: string; isPrivate?: boolean },
@@ -515,14 +546,16 @@ export async function createMomentPost(
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase yapılandırılmadı.');
   const body = text.trim();
-  if (!body && !imageUrl) throw new Error('Metin veya fotoğraf gerekli.');
+  const hasImage = Boolean(imageUrl?.trim());
+  const hasLocation = Boolean(location);
+  if (!hasImage && !hasLocation) throw new Error('Fotoğraf veya konum gerekli.');
   const db = getFirestore(app);
   const ref = doc(collection(db, 'posts'));
 
   const payload: Record<string, unknown> = {
-    title: body.slice(0, 80) || 'Anı',
+    title: body.slice(0, 80) || (hasLocation ? 'Konum paylaşımı' : 'Anı'),
     excerpt: body,
-    imageUrl,
+    imageUrl: imageUrl?.trim() ?? '',
     category: 'moment' as PostCategory,
     authorName: profile.displayName,
     authorUid: uid,
@@ -550,26 +583,33 @@ export async function saveMomentToCollection(
   uid: string,
   imageUrl: string,
   postId?: string,
+  title?: string,
+  _collectionName?: string,
 ): Promise<void> {
   const app = getFirebaseApp();
   if (!app) return;
   const db = getFirestore(app);
 
-  // "Anılar" koleksiyonunu bul veya oluştur
   const collSnap = await getDocs(
-    query(collection(db, 'users', uid, 'collections'), where('name', '==', 'Anılar')),
+    query(
+      collection(db, 'users', uid, 'collections'),
+      where('name', 'in', [...LEGACY_MOMENTS_COLLECTION_NAMES]),
+    ),
   );
 
   let collectionId: string;
   if (collSnap.empty) {
-    collectionId = await createUserCollection(uid, 'Anılar', 'mixed');
+    collectionId = await createUserCollection(uid, MOMENTS_COLLECTION_CANONICAL_NAME, 'mixed');
   } else {
-    collectionId = collSnap.docs[0].id;
+    const preferred = collSnap.docs.find(
+      (d) => String((d.data() as Record<string, unknown>).name ?? '') === MOMENTS_COLLECTION_CANONICAL_NAME,
+    );
+    collectionId = (preferred ?? collSnap.docs[0]).id;
   }
 
   await saveContentToUserCollection(uid, collectionId, {
     contentType: 'moment',
-    title: `Anı — ${new Date().toLocaleDateString('tr-TR')}`,
+    title: title?.trim() || 'Anı',
     imageUrl,
     postId,
   });
@@ -585,12 +625,12 @@ export async function deletePost(postId: string, requesterUid: string): Promise<
   if (!postSnap.exists()) throw new Error('Gönderi bulunamadı.');
   const data = postSnap.data() as Record<string, unknown>;
   if (String(data.authorUid ?? '') !== requesterUid) throw new Error('Bu gönderiyi silemezsiniz.');
-  await deleteAllDocsInCollection(db, ['posts', postId, 'likes']);
+  await deletePostLikesAndMirrors(db, postId);
   await deleteAllDocsInCollection(db, ['posts', postId, 'comments']);
   await deleteDoc(postRef);
 }
 
-/** Yorum sahibi: yorumu ve gönderi sayacını günceller. */
+/** Yorum sahibi: yorumu, yanıtlarını ve gönderi sayacını günceller. */
 export async function deletePostComment(postId: string, commentId: string, requesterUid: string): Promise<void> {
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase yapılandırılmadı.');
@@ -600,12 +640,17 @@ export async function deletePostComment(postId: string, commentId: string, reque
   if (!snap.exists()) return;
   const authorUid = String((snap.data() as Record<string, unknown>).authorUid ?? '');
   if (authorUid !== requesterUid) throw new Error('Bu yorumu silemezsiniz.');
-  await deleteDoc(cref);
-  try {
-    await updateDoc(doc(db, 'posts', postId), { commentCount: increment(-1) });
-  } catch {
-    /* gönderi silinmiş olabilir */
-  }
+
+  const repliesSnap = await getDocs(
+    query(collection(db, 'posts', postId, 'comments'), where('parentId', '==', commentId)),
+  );
+  const deleteCount = 1 + repliesSnap.size;
+
+  const batch = writeBatch(db);
+  batch.delete(cref);
+  repliesSnap.forEach((d) => batch.delete(d.ref));
+  batch.update(doc(db, 'posts', postId), { commentCount: increment(-deleteCount) });
+  await batch.commit();
 }
 
 export async function addPostComment(
@@ -625,6 +670,7 @@ export async function addPostComment(
   const db = getFirestore(app);
   const cref = doc(collection(db, 'posts', postId, 'comments'));
   const postSnap = await getDoc(doc(db, 'posts', postId));
+  if (!postSnap.exists()) throw new Error('Gönderi bulunamadı.');
   const payload: Record<string, unknown> = {
     authorUid,
     authorName,
@@ -809,23 +855,50 @@ export async function deleteNotification(uid: string, notificationId: string): P
 export function subscribePostById(
   postId: string,
   onNext: (post: FeedPost | null) => void,
+  onResolved?: () => void,
 ): () => void {
   const app = getFirebaseApp();
   if (!app) {
+    onResolved?.();
     onNext(null);
     return () => {};
   }
   const db = getFirestore(app);
-  return onSnapshot(doc(db, 'posts', postId), (s) => {
-    if (!s.exists()) {
+  return onSnapshot(
+    doc(db, 'posts', postId),
+    (s) => {
+      onResolved?.();
+      if (!s.exists()) {
+        onNext(null);
+        return;
+      }
+      onNext(mapPost(s.id, s.data() as Record<string, unknown>));
+    },
+    () => {
+      onResolved?.();
       onNext(null);
-      return;
-    }
-    onNext(mapPost(s.id, s.data() as Record<string, unknown>));
-  });
+    },
+  );
 }
 
-/** Beğeni: `posts/{postId}/likes/{uid}` + `users/{uid}/likes/{postId}` atomik batch; bildirim gönderene. */
+/** Silinmiş gönderilere ait yetim beğeni kayıtlarını kullanıcı profilinden temizler. */
+export async function pruneOrphanUserLikes(uid: string): Promise<void> {
+  const app = getFirebaseApp();
+  if (!app) return;
+  const db = getFirestore(app);
+  const likesSnap = await getDocs(collection(db, 'users', uid, 'likes'));
+  await Promise.all(
+    likesSnap.docs.map(async (likeDoc) => {
+      const postId = likeDoc.id;
+      const postSnap = await getDoc(doc(db, 'posts', postId));
+      if (!postSnap.exists()) {
+        await deleteDoc(doc(db, 'users', uid, 'likes', postId));
+      }
+    }),
+  );
+}
+
+/** Beğeni: atomik transaction ile toggle; çift tıklama race'i önlenir. */
 export async function togglePostLike(
   uid: string,
   displayName: string,
@@ -845,42 +918,37 @@ export async function togglePostLike(
   const userLikeRef = doc(db, 'users', uid, 'likes', post.id);
   const postLikeRef = doc(db, 'posts', post.id, 'likes', uid);
   const postRef = doc(db, 'posts', post.id);
-  const snap = await getDoc(userLikeRef);
-
-  if (snap.exists()) {
-    const batch = writeBatch(db);
-    batch.delete(userLikeRef);
-    batch.delete(postLikeRef);
-    batch.update(postRef, { likesCount: increment(-1) });
-    await batch.commit();
-    return false;
-  }
-
   const img = post.imageUrl?.trim() ? post.imageUrl : PLACEHOLDER_IMAGE;
-  const batch = writeBatch(db);
 
-  batch.set(userLikeRef, {
-    postId: post.id,
-    contentId: post.id,
-    title: post.title,
-    imageUrl: img,
-    category: post.category,
-    subtitle: post.authorName ?? '',
-    postAuthorUid: post.authorUid ?? null,
-    excerpt: post.excerpt ?? '',
-    createdAt: serverTimestamp(),
+  const likedNow = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(userLikeRef);
+    if (snap.exists()) {
+      tx.delete(userLikeRef);
+      tx.delete(postLikeRef);
+      tx.update(postRef, { likesCount: increment(-1) });
+      return false;
+    }
+    tx.set(userLikeRef, {
+      postId: post.id,
+      contentId: post.id,
+      title: post.title,
+      imageUrl: img,
+      category: post.category,
+      subtitle: post.authorName ?? '',
+      postAuthorUid: post.authorUid ?? null,
+      excerpt: post.excerpt ?? '',
+      createdAt: serverTimestamp(),
+    });
+    tx.set(postLikeRef, {
+      uid,
+      displayName,
+      createdAt: serverTimestamp(),
+    });
+    tx.update(postRef, { likesCount: increment(1) });
+    return true;
   });
 
-  batch.set(postLikeRef, {
-    uid,
-    displayName,
-    createdAt: serverTimestamp(),
-  });
-
-  batch.update(postRef, { likesCount: increment(1) });
-  await batch.commit();
-
-  if (post.authorUid && post.authorUid !== uid) {
+  if (likedNow && post.authorUid && post.authorUid !== uid) {
     const nid = doc(collection(db, 'users', post.authorUid, 'notifications')).id;
     await pushNotification(post.authorUid, nid, {
       type: 'like',
@@ -891,7 +959,7 @@ export async function togglePostLike(
     });
   }
 
-  return true;
+  return likedNow;
 }
 
 export function subscribeUserLikes(
@@ -1417,14 +1485,26 @@ export async function acceptFollowRequest(viewerUid: string, fromUid: string, vi
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase yapılandırılmadı.');
   const db = getFirestore(app);
-  await deleteDoc(doc(db, 'users', viewerUid, 'followRequests', fromUid));
-  await deleteDoc(doc(db, 'users', viewerUid, 'notifications', `follow_req_${fromUid}`)).catch(() => {});
+
+  const already = await isFollowing(fromUid, viewerUid);
+  if (already) {
+    await deleteDoc(doc(db, 'users', viewerUid, 'followRequests', fromUid)).catch(() => {});
+    await deleteDoc(doc(db, 'users', viewerUid, 'notifications', `follow_req_${fromUid}`)).catch(() => {});
+    await deleteDoc(doc(db, 'users', fromUid, 'followRequests', viewerUid)).catch(() => {});
+    return;
+  }
+
   const batch = writeBatch(db);
   batch.set(doc(db, 'users', viewerUid, 'followers', fromUid), { createdAt: serverTimestamp() });
   batch.set(doc(db, 'users', fromUid, 'following', viewerUid), { createdAt: serverTimestamp() });
   batch.update(doc(db, 'users', viewerUid), { followersCount: increment(1) });
   batch.update(doc(db, 'users', fromUid), { followingCount: increment(1) });
   await batch.commit();
+
+  await deleteDoc(doc(db, 'users', viewerUid, 'followRequests', fromUid)).catch(() => {});
+  await deleteDoc(doc(db, 'users', viewerUid, 'notifications', `follow_req_${fromUid}`)).catch(() => {});
+  await deleteDoc(doc(db, 'users', fromUid, 'followRequests', viewerUid)).catch(() => {});
+
   const nid = doc(collection(db, 'users', fromUid, 'notifications')).id;
   await pushNotification(fromUid, nid, {
     type: 'new_follower',

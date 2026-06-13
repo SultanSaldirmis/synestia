@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, TextInput, View, type TextStyle, type ViewStyle } from 'react-native';
+import { Pressable, Platform, StyleSheet, TextInput, View, type TextStyle, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fontSize, lineHeight, radii, scale, spacing, spacingVertical } from '../theme';
+import { colors, fontSize, radii, scale, spacing, spacingVertical } from '../theme';
 
 export type SearchBarProps = {
   value: string;
@@ -47,12 +47,13 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: scale(44),
     backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacingVertical.sm,
+    paddingVertical: spacingVertical.xs,
   } satisfies ViewStyle,
   icon: {
     marginRight: spacing.sm,
@@ -60,10 +61,19 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: fontSize.md,
-    lineHeight: lineHeight.relaxed,
     fontWeight: '400',
     color: colors.textPrimary,
-    paddingVertical: 0,
+    ...(Platform.OS === 'android'
+      ? {
+          lineHeight: fontSize.md,
+          paddingVertical: 0,
+          textAlignVertical: 'center' as const,
+          includeFontPadding: false,
+        }
+      : {
+          height: scale(36),
+          paddingVertical: spacingVertical.xs,
+        }),
   } satisfies TextStyle,
   clearBtn: {
     marginLeft: spacing.sm,

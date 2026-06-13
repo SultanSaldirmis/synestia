@@ -195,7 +195,7 @@ export function CameraLocationScreen({ navigation }: Props) {
       const thumbUrl = `data:image/jpeg;base64,${thumb.base64 ?? ''}`;
       await saveContentToUserCollection(user.uid, collectionId, {
         contentType: 'moment',
-        title: momentTitle.trim() || `${t('camera.momentDefaultTitle')} — ${new Date().toLocaleDateString()}`,
+        title: momentTitle.trim() || t('camera.momentDefaultTitle'),
         imageUrl: thumbUrl,
       });
       setCollModalVisible(false);
@@ -225,7 +225,7 @@ export function CameraLocationScreen({ navigation }: Props) {
       const thumbUrl2 = `data:image/jpeg;base64,${thumb2.base64 ?? ''}`;
       await saveContentToUserCollection(user.uid, collId, {
         contentType: 'moment',
-        title: momentTitle.trim() || `${t('camera.momentDefaultTitle')} — ${new Date().toLocaleDateString()}`,
+        title: momentTitle.trim() || t('camera.momentDefaultTitle'),
         imageUrl: thumbUrl2,
       });
       setCollModalVisible(false);
@@ -240,44 +240,77 @@ export function CameraLocationScreen({ navigation }: Props) {
 
   // -------- Paylaş --------
 
+  async function publishFeedPostCore(imageUrl: string) {
+    if (!user?.uid) {
+      Alert.alert(t('camera.loginRequired'), t('camera.loginRequiredShare'));
+      return;
+    }
+    if (!photoUri && !locationCoords && !imageUrl.trim()) {
+      Alert.alert(t('camera.photoRequired'), t('camera.needPhotoOrLocation'));
+      return;
+    }
+
+    const profile = await getUserProfileOnce(user.uid);
+    const displayName = profile?.displayName || user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
+
+    const caption =
+      shareText.trim() ||
+      momentTitle.trim() ||
+      (locationCoords && !photoUri ? t('camera.locationShareDefault') : t('camera.momentDefaultCaption'));
+
+    const postId = await createMomentPost(
+      user.uid,
+      { displayName, profileImageUrl: profile?.profileImageUrl, isPrivate: profile?.isPrivate },
+      caption,
+      imageUrl,
+      locationCoords ?? undefined,
+    );
+
+    await saveMomentToCollection(
+      user.uid,
+      imageUrl,
+      postId,
+      momentTitle.trim() || (locationCoords && !photoUri ? t('camera.locationShareDefault') : t('camera.momentDefaultTitle')),
+    );
+
+    showMessage({ message: t('camera.momentPublished'), type: 'success' });
+
+    setPhotoUri(null);
+    setLocationCoords(null);
+    setShareText('');
+    setMomentTitle('');
+    setLocalId(null);
+  }
+
   async function publishMoment() {
     if (!photoUri) {
       Alert.alert(t('camera.photoRequired'), t('camera.photoRequiredShare'));
       return;
     }
-    if (!user?.uid) {
-      Alert.alert(t('camera.loginRequired'), t('camera.loginRequiredShare'));
-      return;
-    }
     setPublishing(true);
     try {
-      const profile = await getUserProfileOnce(user.uid);
-      const displayName = profile?.displayName || user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
-
-      // Firebase Storage olmadan: fotoğrafı küçültüp base64 olarak Firestore'a göm
       const compressed = await ImageManipulator.manipulateAsync(
         photoUri,
         [{ resize: { width: 480 } }],
         { compress: 0.55, format: ImageManipulator.SaveFormat.JPEG, base64: true },
       );
       const downloadUrl = `data:image/jpeg;base64,${compressed.base64 ?? ''}`;
+      await publishFeedPostCore(downloadUrl);
+    } catch (e) {
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('camera.publishFailed'));
+    } finally {
+      setPublishing(false);
+    }
+  }
 
-      const postId = await createMomentPost(
-        user.uid,
-        { displayName, profileImageUrl: profile?.profileImageUrl, isPrivate: profile?.isPrivate },
-        shareText.trim() || t('camera.momentDefaultCaption'),
-        downloadUrl,
-        locationCoords ?? undefined,
-      );
-
-      await saveMomentToCollection(user.uid, downloadUrl, postId);
-
-      showMessage({ message: t('camera.momentPublished'), type: 'success' });
-
-      setPhotoUri(null);
-      setLocationCoords(null);
-      setShareText('');
-      setLocalId(null);
+  async function publishLocationOnly() {
+    if (!locationCoords) {
+      Alert.alert(t('camera.photoRequired'), t('camera.needPhotoOrLocation'));
+      return;
+    }
+    setPublishing(true);
+    try {
+      await publishFeedPostCore('');
     } catch (e) {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : t('camera.publishFailed'));
     } finally {
@@ -320,7 +353,9 @@ export function CameraLocationScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header — no hamburger, back navigation handled by stack */}
       <View style={styles.header}>
-        <View style={styles.iconBtn} />
+        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
+          <Ionicons name="chevron-back" size={scale(28)} color="#fff" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('camera.title')}</Text>
         <View style={styles.iconBtn} />
       </View>
@@ -451,8 +486,10 @@ export function CameraLocationScreen({ navigation }: Props) {
                     onPress={() => void openCamera()}
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="camera-outline" size={scale(18)} color={colors.accentPurple} />
-                    <Text style={styles.secondaryBtnText}>{t('camera.updatePhoto')}</Text>
+                    <Ionicons name="camera-outline" size={scale(18)} color={colors.accentPurple} style={{ flexShrink: 0 }} />
+                    <Text style={styles.secondaryBtnText} numberOfLines={1}>
+                      {t('camera.updatePhoto')}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.collSaveBtn]}
@@ -478,6 +515,17 @@ export function CameraLocationScreen({ navigation }: Props) {
               <View style={styles.sectionRow}>
                 <Ionicons name="paper-plane" size={scale(18)} color={colors.accentPurple} />
                 <Text style={styles.sectionTitle}>{t('camera.shareToFeed')}</Text>
+              </View>
+              <View style={styles.momentTitleWrap}>
+                <Text style={styles.momentTitleLabel}>{t('camera.momentNameLabel')}</Text>
+                <TextInput
+                  style={styles.shareInput}
+                  placeholder={t('camera.momentNamePlaceholder', { date: new Date().toLocaleDateString() })}
+                  placeholderTextColor={colors.textMuted}
+                  value={momentTitle}
+                  onChangeText={setMomentTitle}
+                  maxLength={60}
+                />
               </View>
               <Text style={styles.shareHint}>{t('camera.shareHint')}</Text>
               <TextInput
@@ -535,8 +583,8 @@ export function CameraLocationScreen({ navigation }: Props) {
             ) : (
               <View style={[styles.mapPlaceholder, { width: width - spacing.lg * 2 - spacing.md * 2 }]}>
                 <Ionicons name="map-outline" size={scale(44)} color={colors.textMuted} />
-                <Text style={styles.mapPlaceholderText}>Henüz konum seçilmedi</Text>
-                <Text style={styles.mapPlaceholderSub}>Aşağıdan GPS veya manuel seçim yapabilirsiniz</Text>
+                <Text style={styles.mapPlaceholderText}>{t('camera.noLocationSelected')}</Text>
+                <Text style={styles.mapPlaceholderSub}>{t('camera.locationSelectHint')}</Text>
               </View>
             )}
 
@@ -562,6 +610,47 @@ export function CameraLocationScreen({ navigation }: Props) {
               )}
               <Text style={styles.locationBtnText}>{t('camera.gpsLocation')}</Text>
             </TouchableOpacity>
+
+            {locationCoords && !photoUri ? (
+              <>
+                <View style={styles.momentTitleWrap}>
+                  <Text style={styles.momentTitleLabel}>{t('camera.momentNameLabel')}</Text>
+                  <TextInput
+                    style={styles.shareInput}
+                    placeholder={t('camera.momentNamePlaceholder', { date: new Date().toLocaleDateString() })}
+                    placeholderTextColor={colors.textMuted}
+                    value={momentTitle}
+                    onChangeText={setMomentTitle}
+                    maxLength={60}
+                  />
+                </View>
+                <Text style={styles.shareHint}>{t('camera.shareHint')}</Text>
+                <TextInput
+                  style={styles.shareInput}
+                  placeholder={t('camera.sharePlaceholder')}
+                  placeholderTextColor={colors.textMuted}
+                  value={shareText}
+                  onChangeText={setShareText}
+                  multiline
+                  maxLength={280}
+                />
+                <TouchableOpacity
+                  style={[styles.publishBtn, publishing && styles.btnDisabled]}
+                  onPress={() => void publishLocationOnly()}
+                  disabled={publishing}
+                  activeOpacity={0.85}
+                >
+                  {publishing ? (
+                    <ActivityIndicator size="small" color={colors.textOnAccent} />
+                  ) : (
+                    <Ionicons name="location" size={scale(20)} color={colors.textOnAccent} />
+                  )}
+                  <Text style={styles.publishBtnText}>
+                    {publishing ? t('camera.publishing') : t('camera.shareLocationOnly')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
           </View>
 
           <View style={{ height: spacingVertical.xl }} />
@@ -643,11 +732,18 @@ const styles = StyleSheet.create({
     borderColor: colors.accentPurple,
     borderRadius: radii.md,
     paddingVertical: spacingVertical.sm,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    overflow: 'hidden',
   },
-  secondaryBtnText: { ...typography.button, color: colors.accentPurple },
+  secondaryBtnText: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.accentPurple,
+    flexShrink: 1,
+  },
   btnDisabled: { opacity: 0.45 },
 
   // Collection save button

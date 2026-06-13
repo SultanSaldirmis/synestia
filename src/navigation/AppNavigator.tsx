@@ -58,7 +58,8 @@ function AppStackNavigator({ setNavigationRef }: Props) {
           fontWeight: '600',
           fontSize: scale(17),
         },
-        headerBackTitle: "",
+        headerBackTitle: '',
+        headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
         animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
@@ -99,7 +100,7 @@ function AppStackNavigator({ setNavigationRef }: Props) {
       <Stack.Screen
         name="CreatePost"
         component={CreatePostScreen}
-        options={{ title: t('post.createTitle') }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="UserProfile"

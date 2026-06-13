@@ -53,7 +53,11 @@ export function FollowListScreen({ route }: Props) {
 
   const onRowPress = (item: Row) => {
     if (mode === 'collections') return;
-    navigation.navigate('UserProfile', { userId: item.key });
+    if (item.key === user?.uid) {
+      navigation.navigate('MainTabs', { screen: 'Profile' });
+    } else {
+      navigation.navigate('UserProfile', { userId: item.key });
+    }
   };
 
   return (

@@ -139,6 +139,7 @@
     "deleteTitle": "Delete post",
     "deleteMessage": "This action cannot be undone.",
     "deleteFailed": "Could not delete.",
+    "notFound": "Post not found or has been deleted.",
     "deleteCommentTitle": "Delete comment",
     "deleteCommentMessage": "This comment will be removed.",
     "deleteComment": "Delete comment",
@@ -205,7 +206,8 @@
     "typeLabel": "Type: {{type}}",
     "itemCount": "{{count}} items",
     "androidOnly": "This feature is available from the profile tab.",
-    "namePrompt": "Enter collection name:"
+    "namePrompt": "Enter collection name:",
+    "momentsDefaultName": "Moments"
   },
   "collectionType": {
     "film": "Film",
@@ -245,7 +247,8 @@
   },
   "drawer": {
     "mainApp": "Main App",
-    "momentCapture": "Capture Moment"
+    "momentCapture": "Capture Moment",
+    "crudTest": "MockAPI CRUD Test"
   },
   "camera": {
     "title": "Capture Moment",
@@ -257,8 +260,12 @@
     "gpsLocation": "Get GPS Location",
     "locationSaved": "Location saved",
     "locationPreview": "Location Preview",
-    "noLocationSelected": "No location selected",
+    "noLocationSelected": "No location selected yet",
+    "locationSelectHint": "Choose GPS or manual selection below",
     "locationHint": "Pick a location on the map or use GPS",
+    "shareLocationOnly": "Share location",
+    "locationShareDefault": "Location share",
+    "needPhotoOrLocation": "Photo or location required",
     "gpsLoading": "Getting location...",
     "saved": "Moment saved successfully!",
     "permissionDenied": "Camera permission denied",

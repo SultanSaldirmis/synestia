@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +17,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CachedImage, StarRating } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
@@ -77,6 +79,7 @@ function searchResultToAttached(sr: SearchResult): AttachedContent {
 
 export function CreatePostScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { user, firebaseConfigured } = useAuth();
   const [step, setStep] = useState<WizardStep>(1);
   const [kind, setKind] = useState<PickKind | null>(null);
@@ -175,10 +178,6 @@ export function CreatePostScreen({ navigation }: Props) {
       return;
     }
     const body = text.trim();
-    if (!body) {
-      Alert.alert(t('post.thoughtsLabel'), t('post.addNote'));
-      return;
-    }
     savingRef.current = true;
     setSaving(true);
     try {
@@ -224,7 +223,7 @@ export function CreatePostScreen({ navigation }: Props) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? scale(56) : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={{ flex: 1 }}>
+      <View style={[styles.rootInner, { paddingTop: insets.top + spacingVertical.sm }]}>
       <View style={styles.header}>
         <Pressable onPress={goBackStep} hitSlop={12}>
           <Text style={styles.headerLink}>{step === 1 ? t('common.cancel') : t('common.back')}</Text>
@@ -319,7 +318,12 @@ export function CreatePostScreen({ navigation }: Props) {
       ) : null}
 
       {step === 3 && attachedPreview ? (
-        <View style={styles.stepFlex}>
+        <ScrollView
+          style={styles.stepFlex}
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacingVertical.xxl }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.selectedCard}>
             {attachedPreview.imageUrl?.trim() ? (
               <CachedImage uri={attachedPreview.imageUrl} style={styles.selectedThumb} />
@@ -353,7 +357,7 @@ export function CreatePostScreen({ navigation }: Props) {
             </View>
           ) : null}
           <Text style={styles.hint}>{t('post.publicFeedHint')}</Text>
-        </View>
+        </ScrollView>
       ) : null}
       </View>
       </TouchableWithoutFeedback>
@@ -365,8 +369,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  rootInner: {
+    flex: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacingVertical.md,
   },
   header: {
     flexDirection: 'row',
@@ -479,7 +485,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   input: {
-    flex: 1,
     minHeight: scale(160),
     ...typography.body,
     lineHeight: typography.body.lineHeight,
@@ -495,6 +500,8 @@ const styles = StyleSheet.create({
   hint: {
     ...typography.meta,
     color: colors.textMuted,
+    marginTop: spacingVertical.sm,
+    marginBottom: spacingVertical.md,
   },
   ratingWrap: { marginBottom: spacingVertical.md },
 });

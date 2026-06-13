@@ -149,6 +149,15 @@ export function HomeScreen() {
     setTimeout(() => setRefreshing(false), 1200);
   }, [subscribeFeed]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      onRefresh();
+    });
+    return unsubscribe;
+  }, [navigation, onRefresh]);
+
   const openDetail = useCallback(
     (item: FeedPost) => {
       if (item.category === 'music') {
@@ -392,6 +401,7 @@ export function HomeScreen() {
         enableBookmark={Boolean(user?.uid && isFirebaseConfigured())}
         bookmarkPayload={buildBookmarkPayloadFromPost(item)}
         postRating={item.rating}
+        location={item.location}
         averageRating={
           item.attachedContent?.type === 'book'
             ? contentRatings[`book:${item.attachedContent.id}`]?.averageRating

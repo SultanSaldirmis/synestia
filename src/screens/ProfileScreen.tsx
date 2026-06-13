@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,12 +35,14 @@ import {
   deleteUserCollection,
   togglePostLike,
   updateUserProfileData,
+  pruneOrphanUserLikes,
   type CollectionThemeType,
   type UserCollectionDoc,
   type UserLikeDoc,
 } from '../services/firestoreService';
 import { buildBookmarkPayloadFromPost } from '../utils/buildBookmarkPayload';
 import { getCollectionTypeLabel } from '../utils/collectionLabels';
+import { getCollectionDisplayName } from '../utils/collectionDisplayName';
 import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
@@ -82,6 +84,7 @@ export function ProfileScreen() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [collSaving, setCollSaving] = useState(false);
   const collSavingRef = useRef(false);
+  const likeBusyRef = useRef(new Set<string>());
   const { playTrack } = useMusicPlayer();
 
   const tabs = useMemo(
@@ -105,6 +108,11 @@ export function ProfileScreen() {
   }, [displayName, user?.email]);
 
   const likedIds = useMemo(() => new Set(likes.map((l) => l.contentId)), [likes]);
+
+  useEffect(() => {
+    if (contentTab !== 'likes' || !user?.uid || !firebaseConfigured) return;
+    void pruneOrphanUserLikes(user.uid).catch(() => {});
+  }, [contentTab, firebaseConfigured, user?.uid]);
 
   const bioText = profile?.bio?.trim() || MOCK_USER.bio;
   const followers = profile?.followersCount ?? 0;
@@ -153,6 +161,8 @@ export function ProfileScreen() {
   const handleToggleLike = useCallback(
     async (item: FeedPost) => {
       if (!user?.uid) return;
+      if (likeBusyRef.current.has(item.id)) return;
+      likeBusyRef.current.add(item.id);
       try {
         await togglePostLike(user.uid, actorName, {
           id: item.id,
@@ -165,6 +175,8 @@ export function ProfileScreen() {
         });
       } catch {
         Alert.alert(t('common.error'), t('post.likeFailed'));
+      } finally {
+        likeBusyRef.current.delete(item.id);
       }
     },
     [actorName, user?.uid, t],
@@ -217,7 +229,7 @@ export function ProfileScreen() {
   const confirmDeleteCollection = useCallback(
     (c: UserCollectionDoc) => {
       if (!user?.uid) return;
-      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: c.name }), [
+      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: getCollectionDisplayName(c.name, t) }), [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.delete'),
@@ -494,6 +506,7 @@ export function ProfileScreen() {
                   enableBookmark={Boolean(user?.uid && firebaseConfigured)}
                   bookmarkPayload={buildBookmarkPayloadFromPost(item)}
                   postRating={item.rating}
+                  location={item.location}
                   averageRating={
                     item.attachedContent?.type === 'book'
                       ? contentRatings[`book:${item.attachedContent.id}`]?.averageRating
@@ -575,7 +588,7 @@ export function ProfileScreen() {
                         <Ionicons name="folder-open" size={scale(28)} color={colors.accentPurple} />
                       </View>
                       <Text style={styles.collTileTitle} numberOfLines={2}>
-                        {c.name}
+                        {getCollectionDisplayName(c.name, t)}
                       </Text>
                       <Text style={styles.collTileMeta} numberOfLines={1}>
                         {getCollectionTypeLabel(t, c.type)} · {c.itemsCount}

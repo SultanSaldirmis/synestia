@@ -28,7 +28,19 @@ function logApiError(
   phase: string,
   detail: Record<string, unknown>,
 ): void {
-  console.error(`[Synestia API][${provider}] ${phase}`, detail);
+  const code = String(detail.code ?? '');
+  const status = typeof detail.status === 'number' ? detail.status : undefined;
+  const transient =
+    code === 'ECONNABORTED' ||
+    code === 'ERR_NETWORK' ||
+    code === 'ETIMEDOUT' ||
+    (typeof status === 'number' && status >= 500);
+  const log = transient ? console.warn : console.error;
+  log(`[Synestia API][${provider}] ${phase}`, detail);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getTmdbKey(): string {
@@ -310,64 +322,81 @@ export async function searchBooksAsResults(query: string): Promise<SearchResult[
   const trimmed = query.trim().replace(/\s+/g, ' ');
   if (!trimmed || trimmed.length < 3) return [];
 
-  try {
-    const { data, status } = await axios.get<OpenLibrarySearchResponse>(OPEN_LIBRARY_SEARCH, {
-      params: { q: trimmed, limit: 10 },
-      timeout: 18_000,
-      validateStatus: (s) => s === 200,
-    });
+  const timeouts = [10_000, 15_000];
+  for (let attempt = 0; attempt < timeouts.length; attempt++) {
+    try {
+      const { data, status } = await axios.get<OpenLibrarySearchResponse>(OPEN_LIBRARY_SEARCH, {
+        params: { q: trimmed, limit: 10 },
+        timeout: timeouts[attempt],
+        validateStatus: (s) => s === 200,
+      });
 
-    if (!data || typeof data !== 'object') {
-      logApiError('Open Library', 'invalid_response', { code: 'EMPTY_BODY', status });
+      if (!data || typeof data !== 'object') {
+        logApiError('Open Library', 'invalid_response', { code: 'EMPTY_BODY', status });
+        return [];
+      }
+
+      const docs = Array.isArray(data.docs) ? data.docs.slice(0, 10) : [];
+      if (docs.length === 0) return [];
+
+      const rows: SearchResult[] = [];
+      for (const item of docs) {
+        const key = typeof item.key === 'string' ? item.key.trim() : '';
+        if (!key) continue;
+        const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim() : 'Başlıksız';
+        const authors = item.author_name;
+        const subtitle =
+          Array.isArray(authors) && authors.length > 0 && typeof authors[0] === 'string'
+            ? authors[0]
+            : 'Bilinmeyen Yazar';
+        rows.push({
+          id: encodeOpenLibraryKey(key),
+          title,
+          subtitle,
+          imageUrl: openLibraryCoverUrl(item),
+          type: 'book' as const,
+        });
+      }
+
+      if (rows.length === 0 && docs.length > 0) {
+        console.warn('[Synestia API][Open Library] docs_missing_keys', { query: trimmed, docCount: docs.length });
+      }
+
+      return rows;
+    } catch (e) {
+      const isLastAttempt = attempt === timeouts.length - 1;
+      if (axios.isAxiosError(e)) {
+        const code = e.code ?? 'AXIOS_ERROR';
+        const status = e.response?.status;
+        const transient =
+          code === 'ECONNABORTED' ||
+          code === 'ERR_NETWORK' ||
+          code === 'ETIMEDOUT' ||
+          (typeof status === 'number' && status >= 500);
+        if (!isLastAttempt && transient) {
+          await sleep(400);
+          continue;
+        }
+        logApiError('Open Library', 'search_failed', {
+          code,
+          status,
+          message: e.message,
+          responseSnippet:
+            typeof e.response?.data === 'string'
+              ? e.response.data.slice(0, 400)
+              : JSON.stringify(e.response?.data ?? '').slice(0, 400),
+        });
+      } else {
+        logApiError('Open Library', 'search_failed', {
+          code: 'UNKNOWN',
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
       return [];
     }
-
-    const docs = Array.isArray(data.docs) ? data.docs.slice(0, 10) : [];
-    if (docs.length === 0) return [];
-
-    const rows: SearchResult[] = [];
-    for (const item of docs) {
-      const key = typeof item.key === 'string' ? item.key.trim() : '';
-      if (!key) continue;
-      const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim() : 'Başlıksız';
-      const authors = item.author_name;
-      const subtitle =
-        Array.isArray(authors) && authors.length > 0 && typeof authors[0] === 'string'
-          ? authors[0]
-          : 'Bilinmeyen Yazar';
-      rows.push({
-        id: encodeOpenLibraryKey(key),
-        title,
-        subtitle,
-        imageUrl: openLibraryCoverUrl(item),
-        type: 'book' as const,
-      });
-    }
-
-    if (rows.length === 0 && docs.length > 0) {
-      console.error('[Synestia API][Open Library] docs_missing_keys', { query: trimmed, docCount: docs.length });
-    }
-
-    return rows;
-  } catch (e) {
-    if (axios.isAxiosError(e)) {
-      logApiError('Open Library', 'search_failed', {
-        code: e.code ?? 'AXIOS_ERROR',
-        status: e.response?.status,
-        message: e.message,
-        responseSnippet:
-          typeof e.response?.data === 'string'
-            ? e.response.data.slice(0, 400)
-            : JSON.stringify(e.response?.data ?? '').slice(0, 400),
-      });
-    } else {
-      logApiError('Open Library', 'search_failed', {
-        code: 'UNKNOWN',
-        message: e instanceof Error ? e.message : String(e),
-      });
-    }
-    return [];
   }
+
+  return [];
 }
 
 /** Üç kaynağı paralel çağırır (Keşfet + Firestore için ayrı katman). */

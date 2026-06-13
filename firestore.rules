@@ -20,6 +20,11 @@ service cloud.firestore {
         .hasOnly(['likesCount', 'commentCount']);
     }
 
+    function isPostAuthor(postId) {
+      return isSignedIn()
+        && request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.authorUid;
+    }
+
     // Kullanıcı profili (kök belge)
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -27,16 +32,23 @@ service cloud.firestore {
       allow update: if isOwner(userId) || (isSignedIn() && onlyUserCounterFields());
       allow delete: if isOwner(userId);
 
-      // Takipçiler — takip eden kullanıcı kendi kaydını oluşturur/siler
+      // Takipçiler — takip eden kullanıcı kendi kaydını oluşturur; profil sahibi istek kabul ederken de oluşturabilir
       match /followers/{followerId} {
         allow read: if isSignedIn();
-        allow create, delete: if isSignedIn() && request.auth.uid == followerId;
+        allow create, delete: if isSignedIn() && (
+          request.auth.uid == followerId
+          || (isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId)/followRequests/$(followerId)))
+        );
       }
 
-      // Takip edilenler — yalnızca profil sahibi yönetir
+      // Takip edilenler — profil sahibi veya istek kabul eden (targetId) oluşturabilir
       match /following/{targetId} {
         allow read: if isSignedIn();
-        allow create, delete: if isOwner(userId);
+        allow create, delete: if isOwner(userId) || (
+          isSignedIn()
+          && request.auth.uid == targetId
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid)/followRequests/$(userId))
+        );
       }
 
       // Takip istekleri — istek gönderen oluşturur; profil sahibi veya gönderen siler
@@ -52,10 +64,15 @@ service cloud.firestore {
         allow create: if isSignedIn();
       }
 
-      // Beğeniler — yalnızca profil sahibi
+      // Beğeniler — profil sahibi yazar; post sahibi silme sırasında aynayı temizleyebilir
       match /likes/{postId} {
         allow read: if isSignedIn();
-        allow write: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+        allow delete: if isOwner(userId) || (
+          isSignedIn()
+          && exists(/databases/$(database)/documents/posts/$(postId))
+          && request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.authorUid
+        );
       }
 
       // Koleksiyonlar — okuma herkese; yazma sahibe
@@ -79,13 +96,24 @@ service cloud.firestore {
 
       match /likes/{uid} {
         allow read: if isSignedIn();
-        allow write: if isSignedIn() && request.auth.uid == uid;
+        allow create, update: if isSignedIn() && request.auth.uid == uid;
+        allow delete: if isSignedIn() && (request.auth.uid == uid || isPostAuthor(postId));
       }
 
       match /comments/{commentId} {
-        allow read, create: if isSignedIn();
-        allow delete: if isSignedIn()
-                      && request.auth.uid == resource.data.authorUid;
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+                      && exists(/databases/$(database)/documents/posts/$(postId));
+        allow delete: if isSignedIn() && (
+          request.auth.uid == resource.data.authorUid
+          || (
+            resource.data.keys().hasAny(['parentId'])
+            && resource.data.parentId is string
+            && resource.data.parentId != ''
+            && get(/databases/$(database)/documents/posts/$(postId)/comments/$(resource.data.parentId)).data.authorUid == request.auth.uid
+          )
+          || isPostAuthor(postId)
+        );
       }
     }
 
@@ -116,6 +144,13 @@ service cloud.firestore {
       allow read, create: if isSignedIn();
       allow delete: if isSignedIn()
                     && request.auth.uid == resource.data.authorUid;
+    }
+
+    // Gönderi raporları — giriş yapmış kullanıcı kendi adına rapor oluşturabilir
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+                    && request.auth.uid == request.resource.data.reporterUid;
+      allow read, update, delete: if false;
     }
   }
 }

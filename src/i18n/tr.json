@@ -139,6 +139,7 @@
     "deleteTitle": "Gönderiyi sil",
     "deleteMessage": "Bu işlem geri alınamaz.",
     "deleteFailed": "Silinemedi.",
+    "notFound": "Gönderi bulunamadı veya silinmiş.",
     "deleteCommentTitle": "Yorumu sil",
     "deleteCommentMessage": "Bu yorum kaldırılacak.",
     "deleteComment": "Yorumu sil",
@@ -205,7 +206,8 @@
     "typeLabel": "Tür: {{type}}",
     "itemCount": "{{count}} öğe",
     "androidOnly": "Bu özellik profil sekmesinden kullanılabilir.",
-    "namePrompt": "Koleksiyon adı girin:"
+    "namePrompt": "Koleksiyon adı girin:",
+    "momentsDefaultName": "Anılar"
   },
   "collectionType": {
     "film": "Film",
@@ -245,7 +247,8 @@
   },
   "drawer": {
     "mainApp": "Ana Uygulama",
-    "momentCapture": "Anı Kaydet"
+    "momentCapture": "Anı Kaydet",
+    "crudTest": "MockAPI CRUD Testi"
   },
   "camera": {
     "title": "Anı Kaydet",
@@ -257,8 +260,12 @@
     "gpsLocation": "GPS Konumunu Al",
     "locationSaved": "Konum kaydedildi",
     "locationPreview": "Konum Önizleme",
-    "noLocationSelected": "Konum seçilmedi",
+    "noLocationSelected": "Henüz konum seçilmedi",
+    "locationSelectHint": "Aşağıdan GPS veya manuel seçim yapabilirsiniz",
     "locationHint": "Haritadan konum seçin veya GPS kullanın",
+    "shareLocationOnly": "Konumu Paylaş",
+    "locationShareDefault": "Konum paylaşımı",
+    "needPhotoOrLocation": "Fotoğraf veya konum gerekli",
     "gpsLoading": "Konum alınıyor...",
     "saved": "Anı başarıyla kaydedildi!",
     "permissionDenied": "Kamera izni verilmedi",

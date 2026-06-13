@@ -21,7 +21,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#121212"
       },
-      "package": "com.synestia.app"
+      "package": "com.synestia.app",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "scheme": "synestia",
     "plugins": [

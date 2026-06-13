@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -43,6 +43,7 @@ import {
   type UserProfileDoc,
 } from '../services/firestoreService';
 import { buildBookmarkPayloadFromPost } from '../utils/buildBookmarkPayload';
+import { getCollectionDisplayName } from '../utils/collectionDisplayName';
 import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography } from '../theme';
@@ -74,6 +75,7 @@ export function UserProfileScreen() {
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const likeBusyRef = useRef(new Set<string>());
   const [contentRatings, setContentRatings] = useState<Record<string, { averageRating: number; totalRatings: number }>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [refreshing, setRefreshing] = useState(false);
@@ -304,6 +306,8 @@ export function UserProfileScreen() {
   const handleToggleLike = useCallback(
     async (item: FeedPost) => {
       if (!user?.uid) return;
+      if (likeBusyRef.current.has(item.id)) return;
+      likeBusyRef.current.add(item.id);
       try {
         await togglePostLike(user.uid, actorName, {
           id: item.id,
@@ -316,6 +320,8 @@ export function UserProfileScreen() {
         });
       } catch {
         Alert.alert(t('common.error'), t('post.likeFailed'));
+      } finally {
+        likeBusyRef.current.delete(item.id);
       }
     },
     [actorName, user?.uid, t],
@@ -413,7 +419,7 @@ export function UserProfileScreen() {
   const confirmDeleteCollection = useCallback(
     (c: UserCollectionDoc) => {
       if (!user?.uid || !isSelf) return;
-      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: c.name }), [
+      Alert.alert(t('collection.deleteTitle'), t('collection.deleteMessage', { name: getCollectionDisplayName(c.name, t) }), [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.delete'),
@@ -643,6 +649,7 @@ export function UserProfileScreen() {
                   enableBookmark={Boolean(user?.uid && firebaseConfigured)}
                   bookmarkPayload={buildBookmarkPayloadFromPost(item)}
                   postRating={item.rating}
+                  location={item.location}
                   averageRating={
                     item.attachedContent?.type === 'book'
                       ? contentRatings[`book:${item.attachedContent.id}`]?.averageRating
@@ -722,7 +729,7 @@ export function UserProfileScreen() {
                   >
                     <Ionicons name="folder-open-outline" size={THUMB / 2} color={colors.accentPurple} />
                     <Text style={styles.rowTitle} numberOfLines={1}>
-                      {c.name}
+                      {getCollectionDisplayName(c.name, t)}
                     </Text>
                   </Pressable>
                   {isSelf && user?.uid ? (

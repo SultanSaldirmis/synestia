@@ -3,7 +3,7 @@ import { Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, Style
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { CachedImage, ScreenSafeArea } from '../components';
+import { CachedImage, ProfileImageZoomModal, ScreenSafeArea } from '../components';
 import { useAuth } from '../context/AuthContext';
 import type { AppStackParamList } from '../navigation/types';
 import { searchBooksAsResults, searchSpotifyTracksAsResults, searchTmdbMoviesAsResults } from '../services/apiService';
@@ -16,6 +16,7 @@ import {
 } from '../services/firestoreService';
 import type { SearchResult } from '../types/searchResult';
 import { getCollectionTypeLabel } from '../utils/collectionLabels';
+import { getCollectionDisplayName } from '../utils/collectionDisplayName';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CollectionDetail'>;
@@ -29,6 +30,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [zoomUri, setZoomUri] = useState<string | null>(null);
   const isOwner = user?.uid === userId;
   const filters: Array<'movie' | 'music' | 'book'> = useMemo(() => {
     if (collectionType === 'film') return ['movie'];
@@ -133,7 +135,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
           <Ionicons name="arrow-back" size={scale(24)} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.title} numberOfLines={1}>
-          {collectionName}
+          {getCollectionDisplayName(collectionName, t)}
         </Text>
         {isOwner ? (
           <Pressable onPress={onDeleteCollection} hitSlop={12} style={styles.trashHit} accessibilityLabel={t('collection.delete')}>
@@ -160,6 +162,10 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
               <Pressable
                 style={({ pressed }) => [styles.row, styles.rowFlex, pressed && styles.rowPressed]}
                 onPress={() => {
+                  if (item.contentType === 'moment' && item.imageUrl?.trim()) {
+                    setZoomUri(item.imageUrl.trim());
+                    return;
+                  }
                   if (item.contentType === 'music') return;
                   const u = item.externalUrl?.trim();
                   if (u) void Linking.openURL(u);
@@ -225,6 +231,7 @@ export function CollectionDetailScreen({ navigation, route }: Props) {
           </ScrollView>
         </View>
       </Modal>
+      <ProfileImageZoomModal visible={Boolean(zoomUri)} imageUri={zoomUri ?? undefined} onClose={() => setZoomUri(null)} />
     </ScreenSafeArea>
   );
 }

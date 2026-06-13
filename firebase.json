@@ -3,6 +3,6 @@
     "database": "(default)",
     "location": "eur3",
     "rules": "firestore.rules",
-    "indexes": "N"
+    "indexes": "firestore.indexes.json"
   }
 }

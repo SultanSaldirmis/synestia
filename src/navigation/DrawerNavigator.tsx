@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppNavigator } from './AppNavigator';
@@ -23,6 +24,7 @@ import { colors, spacing, spacingVertical, typography, radii, scale } from '../t
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.78, 300);
 const ANIM_DURATION = 260;
+const DRAWER_LOGO = require('../assets/synestia_background.png');
 
 // ─── Drawer Context ────────────────────────────────────────────────────────
 type DrawerContextType = {
@@ -68,7 +70,7 @@ function DrawerContent({ closeDrawer, navigateTo }: DrawerContentProps) {
       {/* Header */}
       <View style={styles.drawerHeader}>
         <View style={styles.avatarCircle}>
-          <Ionicons name="musical-notes" size={scale(28)} color={colors.accentPurple} />
+          <Image source={DRAWER_LOGO} style={styles.drawerLogo} contentFit="cover" />
         </View>
         <Text style={styles.drawerAppName}>{t('common.appName')}</Text>
         {user && (
@@ -229,6 +231,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.accentPurple,
     marginBottom: spacingVertical.xs,
+    overflow: 'hidden',
+  },
+  drawerLogo: {
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
   },
   drawerAppName: {
     ...typography.screenTitle,

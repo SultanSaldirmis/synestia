@@ -4,8 +4,8 @@
       "collectionGroup": "comments",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "authorUid", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        { "fieldPath": "contentKey", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
   ],

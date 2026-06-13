@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -14,6 +15,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +39,7 @@ import {
 } from '../services/firestoreService';
 import type { FeedPost } from '../data/mockData';
 import { profileImageDisplayUri } from '../utils/profileImage';
+import { localizeMomentExcerpt } from '../utils/localizeMomentText';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
 
 type DetailRoute = RouteProp<RootStackParamList, 'Detail'>;
@@ -58,23 +62,56 @@ export function DetailScreen() {
     commentCount: routeCommentCount,
   } = route.params;
   const { user, firebaseConfigured } = useAuth();
+  const headerHeight = useHeaderHeight();
+  const scrollRef = useRef<ScrollView>(null);
   const [liked, setLiked] = useState(false);
   const [livePost, setLivePost] = useState<FeedPost | null>(null);
+  const [postResolved, setPostResolved] = useState(!isFirebaseConfigured());
+  const missingHandledRef = useRef(false);
   const [comments, setComments] = useState<PostCommentDoc[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const commentSubmittingRef = useRef(false);
+  const likeBusyRef = useRef(false);
+  const [likeSubmitting, setLikeSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<PostCommentDoc | null>(null);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
 
   const { width: windowWidth } = Dimensions.get('window');
   const heroHeight = roundLayout(Math.min(verticalScale(240), windowWidth * 0.58));
 
+  const displayTitle = livePost?.title ?? title;
+  const displayImageUrl = livePost?.imageUrl ?? imageUrl;
+  const displayCategory = livePost?.category ?? category;
+  const displayAuthorName = livePost?.authorName ?? routeAuthorName;
+  const displayDescription = livePost?.excerpt ?? description;
+  const displayBody = livePost?.excerpt ?? body ?? description;
+  const postAuthorUid = livePost?.authorUid ?? authorUid;
+  const postLocation = livePost?.location;
+
+  const detailTextRaw =
+    displayBody ?? 'Bu içerik için henüz açıklama eklenmedi.';
   const detailText =
-    body ?? description ?? 'Bu içerik için henüz açıklama eklenmedi.';
-  const normalizedDescription = description?.trim() ?? '';
+    displayCategory === 'moment' ? localizeMomentExcerpt(detailTextRaw, t) : detailTextRaw;
+  const localizedTitle =
+    displayCategory === 'moment' ? localizeMomentExcerpt(displayTitle, t) : displayTitle;
+  const localizedDescription =
+    displayCategory === 'moment'
+      ? localizeMomentExcerpt(displayDescription ?? '', t)
+      : (displayDescription ?? '').trim();
   const normalizedBody = detailText.trim();
-  const showTagline = Boolean(normalizedDescription && normalizedDescription !== normalizedBody);
+  const showTagline =
+    Boolean(localizedDescription) &&
+    localizedDescription !== normalizedBody &&
+    localizedDescription !== localizedTitle;
+  const hideBodyDuplicate =
+    displayCategory === 'moment' && normalizedBody === localizedTitle;
+  const isText =
+    displayCategory === 'text' || (!displayImageUrl?.trim() && !postLocation);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: localizedTitle });
+  }, [navigation, localizedTitle]);
 
   const actorName = user?.displayName || user?.email?.split('@')[0] || t('common.defaultUser');
 
@@ -90,8 +127,19 @@ export function DetailScreen() {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
-    return subscribePostById(id, setLivePost);
+    missingHandledRef.current = false;
+    setPostResolved(false);
+    return subscribePostById(id, setLivePost, () => setPostResolved(true));
   }, [id]);
+
+  useEffect(() => {
+    if (!firebaseConfigured || !postResolved || livePost !== null) return;
+    if (missingHandledRef.current) return;
+    missingHandledRef.current = true;
+    Alert.alert(t('common.error'), t('post.notFound'), [
+      { text: t('common.close'), onPress: () => navigation.goBack() },
+    ]);
+  }, [firebaseConfigured, livePost, navigation, postResolved, t]);
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
@@ -100,17 +148,15 @@ export function DetailScreen() {
 
   const commentCount = livePost?.commentCount ?? routeCommentCount ?? 0;
   const likesCountLive = livePost?.likesCount ?? 0;
-  const postAuthorUid = livePost?.authorUid ?? authorUid;
-  const isText = category === 'text' || !imageUrl?.trim();
   const canDeletePost =
     Boolean(firebaseConfigured && user?.uid && postAuthorUid && user.uid === postAuthorUid);
   const catalogRef =
-    category === 'book'
+    displayCategory === 'book'
       ? {
           kind: 'book' as const,
           id: livePost?.attachedContent?.type === 'book' ? livePost.attachedContent.id : id,
         }
-      : category === 'movie'
+      : displayCategory === 'movie'
         ? {
             kind: 'movie' as const,
             id: livePost?.attachedContent?.type === 'movie' ? livePost.attachedContent.id : id.replace(/^tmdb_/, ''),
@@ -131,25 +177,31 @@ export function DetailScreen() {
   // Do not hide comments behind parent filtering; render all in chronological order.
 
   const onToggleLike = useCallback(async () => {
+    if (likeBusyRef.current) return;
     if (!user?.uid) {
       Alert.alert(t('post.loginRequired'), t('post.loginRequiredLike'));
       return;
     }
+    likeBusyRef.current = true;
+    setLikeSubmitting(true);
     try {
       const next = await togglePostLike(user.uid, actorName, {
         id,
-        title,
-        imageUrl: imageUrl ?? '',
-        category,
-        authorName: routeAuthorName ?? description,
+        title: displayTitle,
+        imageUrl: displayImageUrl ?? '',
+        category: displayCategory,
+        authorName: displayAuthorName ?? displayDescription,
         authorUid: postAuthorUid,
-        excerpt: description ?? body,
+        excerpt: displayDescription ?? displayBody,
       });
       setLiked(next);
     } catch {
       Alert.alert(t('common.error'), t('post.likeFailed'));
+    } finally {
+      likeBusyRef.current = false;
+      setLikeSubmitting(false);
     }
-  }, [actorName, body, category, description, id, imageUrl, postAuthorUid, routeAuthorName, title, user?.uid, t]);
+  }, [actorName, displayAuthorName, displayBody, displayCategory, displayDescription, displayImageUrl, displayTitle, id, postAuthorUid, user?.uid, t]);
 
   const sendComment = useCallback(async () => {
     if (commentSubmittingRef.current) return;
@@ -297,83 +349,123 @@ export function DetailScreen() {
 
   return (
     <ScreenSafeArea edges={['left', 'right', 'bottom']}>
+      {firebaseConfigured && !postResolved ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.accentPurple} />
+        </View>
+      ) : firebaseConfigured && postResolved && !livePost ? (
+        <View style={styles.loadingWrap} />
+      ) : (
       <KeyboardAvoidingView
-        style={styles.scroll}
+        style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? scale(56) : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {!isText && imageUrl ? (
-          <CachedImage
-            uri={imageUrl}
-            style={[styles.hero, { height: heroHeight }]}
-          />
-        ) : isText ? (
-          <View style={[styles.textHero, { height: heroHeight }]}>
-            <Ionicons name="document-text-outline" size={scale(56)} color={colors.accentPurple} />
-          </View>
-        ) : null}
-
-        <View style={styles.block}>
-          <View style={styles.titleRow}>
-            {routeAuthorName ? (
-              <Pressable onPress={() => postAuthorUid && navigateToProfile(postAuthorUid)} style={{ flex: 1 }}>
-                <Text style={styles.authorHint} numberOfLines={1}>
-                  {routeAuthorName}
-                </Text>
-              </Pressable>
-            ) : (
-              <View style={{ flex: 1 }} />
-            )}
-            {canDeletePost ? (
-              <Pressable onPress={onDeletePost} hitSlop={10} accessibilityLabel={t('post.deleteTitle')}>
-                <Ionicons name="trash-outline" size={scale(22)} color={colors.textMuted} />
-              </Pressable>
-            ) : null}
-          </View>
-          <Text style={styles.title}>{title}</Text>
-          {catalogRef ? (
-            <View style={styles.bookRatingRow}>
-              {typeof catalogRating?.averageRating === 'number' ? (
-                <StarRating
-                  rating={catalogRating.averageRating}
-                  totalRatings={catalogRating.totalRatings ?? 0}
-                />
-              ) : (
-                <Text style={styles.unratedText}>{t('rating.notRatedYet')}</Text>
-              )}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.scrollContent,
+            firebaseConfigured && user?.uid && Platform.OS === 'ios'
+              ? { paddingBottom: spacingVertical.xxl + scale(120) }
+              : null,
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {!isText && displayImageUrl?.trim() ? (
+            <CachedImage
+              uri={displayImageUrl}
+              style={[styles.hero, { height: heroHeight }]}
+            />
+          ) : postLocation ? (
+            <MapView
+              style={[styles.hero, { height: heroHeight }]}
+              region={{
+                ...postLocation,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              scrollEnabled={false}
+              zoomEnabled={false}
+            >
+              <Marker coordinate={postLocation} pinColor={colors.accentPurple} />
+            </MapView>
+          ) : isText ? (
+            <View style={[styles.textHero, { height: heroHeight }]}>
+              <Ionicons name="document-text-outline" size={scale(56)} color={colors.accentPurple} />
             </View>
           ) : null}
-          {showTagline ? <Text style={styles.tagline}>{description}</Text> : null}
-          <Text style={styles.body}>{detailText}</Text>
 
-          <View style={styles.detailActions}>
-            <Pressable
-              onPress={() => void onToggleLike()}
-              style={({ pressed }) => [styles.iconAction, pressed && styles.likeRowPressed]}
-            >
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={scale(22)}
-                color={liked ? colors.profileAccent : colors.textMuted}
-              />
-              <Text style={styles.iconActionCount}>{likesCountLive}</Text>
-            </Pressable>
-            <Pressable onPress={onShareDetail} style={styles.iconAction} accessibilityLabel={t('post.share')}>
-              <Ionicons name="share-outline" size={scale(22)} color={colors.textMuted} />
-            </Pressable>
+          <View style={styles.block}>
+            <View style={styles.titleRow}>
+              {displayAuthorName ? (
+                <Pressable onPress={() => postAuthorUid && navigateToProfile(postAuthorUid)} style={{ flex: 1 }}>
+                  <Text style={styles.authorHint} numberOfLines={1}>
+                    {displayAuthorName}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={{ flex: 1 }} />
+              )}
+              {canDeletePost ? (
+                <Pressable onPress={onDeletePost} hitSlop={10} accessibilityLabel={t('post.deleteTitle')}>
+                  <Ionicons name="trash-outline" size={scale(22)} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+            </View>
+            <Text style={styles.title}>{localizedTitle}</Text>
+            {catalogRef ? (
+              <View style={styles.bookRatingRow}>
+                {typeof catalogRating?.averageRating === 'number' ? (
+                  <StarRating
+                    rating={catalogRating.averageRating}
+                    totalRatings={catalogRating.totalRatings ?? 0}
+                  />
+                ) : (
+                  <Text style={styles.unratedText}>{t('rating.notRatedYet')}</Text>
+                )}
+              </View>
+            ) : null}
+            {showTagline ? <Text style={styles.tagline}>{localizedDescription}</Text> : null}
+            {postLocation ? (
+              <Text style={styles.coordsText}>
+                {postLocation.latitude.toFixed(5)}, {postLocation.longitude.toFixed(5)}
+              </Text>
+            ) : null}
+            {!hideBodyDuplicate ? <Text style={styles.body}>{detailText}</Text> : null}
+
+            <View style={styles.detailActions}>
+              <Pressable
+                onPress={() => void onToggleLike()}
+                disabled={likeSubmitting}
+                style={({ pressed }) => [styles.iconAction, pressed && styles.likeRowPressed, likeSubmitting && styles.likeDisabled]}
+              >
+                <Ionicons
+                  name={liked ? 'heart' : 'heart-outline'}
+                  size={scale(22)}
+                  color={liked ? colors.profileAccent : colors.textMuted}
+                />
+                <Text style={styles.iconActionCount}>{likesCountLive}</Text>
+              </Pressable>
+              <Pressable onPress={onShareDetail} style={styles.iconAction} accessibilityLabel={t('post.share')}>
+                <Ionicons name="share-outline" size={scale(22)} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.commentHead}>{t('post.commentCount', { count: commentCount })}</Text>
+
+            {comments.length > 0 ? (
+              <View style={styles.commentsList}>
+                {comments.map((c) => renderComment(c))}
+              </View>
+            ) : null}
           </View>
+        </ScrollView>
 
-          <Text style={styles.commentHead}>{t('post.commentCount', { count: commentCount })}</Text>
-
-          {firebaseConfigured && user?.uid ? (
-            <View style={styles.commentBox}>
+        {firebaseConfigured && user?.uid && livePost ? (
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.stickyCommentBar}>
               {replyTo ? (
                 <View style={styles.replyIndicator}>
                   <Text style={styles.replyIndicatorText} numberOfLines={1}>
@@ -392,6 +484,11 @@ export function DetailScreen() {
                   value={commentText}
                   onChangeText={setCommentText}
                   multiline
+                  onFocus={() => {
+                    if (Platform.OS === 'ios') {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }
+                  }}
                 />
                 <Pressable
                   onPress={() => void sendComment()}
@@ -406,23 +503,17 @@ export function DetailScreen() {
                 </Pressable>
               </View>
             </View>
-          ) : null}
-
-          {comments.length > 0 ? (
-            <View style={styles.commentsList}>
-              {comments.map((c) => renderComment(c))}
-            </View>
-          ) : null}
-
-        </View>
-      </ScrollView>
-      </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+        ) : null}
       </KeyboardAvoidingView>
+      )}
     </ScreenSafeArea>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   scroll: { flex: 1, backgroundColor: colors.background },
   scrollContent: { paddingBottom: spacingVertical.xxl },
   hero: { width: '100%', backgroundColor: colors.surfaceElevated },
@@ -470,6 +561,11 @@ const styles = StyleSheet.create({
     color: colors.accentLavender,
     marginBottom: spacingVertical.md,
   },
+  coordsText: {
+    ...typography.meta,
+    color: colors.textSecondary,
+    marginBottom: spacingVertical.sm,
+  },
   body: {
     ...typography.body,
     color: colors.textSecondary,
@@ -482,6 +578,15 @@ const styles = StyleSheet.create({
     marginBottom: spacingVertical.sm,
   },
   likeRowPressed: { opacity: 0.85 },
+  likeDisabled: { opacity: 0.5 },
+  stickyCommentBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacingVertical.sm,
+    paddingBottom: spacingVertical.md,
+    backgroundColor: colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   commentBox: { marginBottom: spacingVertical.lg },
   replyIndicator: {
     flexDirection: 'row',

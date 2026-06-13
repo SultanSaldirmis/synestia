@@ -28,6 +28,7 @@ import {
 } from '../services/firestoreService';
 import { getCollectionTypeLabel } from '../utils/collectionLabels';
 import { defaultHandleFromName } from '../utils/formatRelativeTime';
+import { localizeMomentExcerpt } from '../utils/localizeMomentText';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
 import { CachedImage } from './CachedImage';
@@ -71,6 +72,7 @@ export type PostCardProps = {
   averageRating?: number;
   totalRatings?: number;
   postRating?: number;
+  location?: { latitude: number; longitude: number };
 };
 
 const NEW_COLL_TYPES: CollectionThemeType[] = ['film', 'music', 'book', 'mixed'];
@@ -113,6 +115,7 @@ export function PostCard({
   averageRating,
   totalRatings,
   postRating,
+  location,
 }: PostCardProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -187,11 +190,15 @@ export function PostCard({
   };
   // moment gönderileri imageUrl gösterir; text kategorisi imageUrl yoksa saf metin postu sayılır
   const isTextPost = !hasAttached && (category === 'text' || category === undefined) && !imageUrl?.trim();
+  const isLocationOnlyMoment = category === 'moment' && !imageUrl?.trim() && Boolean(location);
   const showCommentBox = Boolean(onSubmitComment && onChangeCommentDraft !== undefined && commentDraft !== undefined);
   const avatarUri = profileImageDisplayUri(authorAvatarStored);
   const displayName = (authorName ?? t('common.defaultUser')).replace(/^@/, '').trim() || t('common.defaultUser');
   const handle = authorHandle ?? defaultHandleFromName(authorName);
-  const bodyText = excerpt?.trim() || title;
+  const bodyText =
+    category === 'moment'
+      ? localizeMomentExcerpt(excerpt?.trim() || title, t)
+      : excerpt?.trim() || title;
   const effectiveRating = typeof postRating === 'number' ? postRating : averageRating;
 
   const openComments = onPressComment ?? onPress;
@@ -261,6 +268,13 @@ export function PostCard({
       ) : isTextPost ? (
         <View style={styles.textPostIconRow}>
           <Ionicons name="document-text-outline" size={scale(22)} color={colors.accentPurpleMuted} />
+        </View>
+      ) : isLocationOnlyMoment && location ? (
+        <View style={styles.locationBadge}>
+          <Ionicons name="location" size={scale(20)} color={colors.accentPurple} />
+          <Text style={styles.locationBadgeText} numberOfLines={1}>
+            {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+          </Text>
         </View>
       ) : null}
 
@@ -667,6 +681,23 @@ const styles = StyleSheet.create({
   },
   textPostIconRow: {
     marginBottom: spacingVertical.xs,
+  },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacingVertical.sm,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacingVertical.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  locationBadgeText: {
+    ...typography.meta,
+    color: colors.textSecondary,
+    flex: 1,
   },
   bodyText: {
     ...typography.body,

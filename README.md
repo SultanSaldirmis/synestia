@@ -145,7 +145,9 @@ Aşağıdaki tabloda her madde için **tek bir somut örnek** (dosya + satır) v
 2. `env.example` dosyasını `.env` olarak kopyalayıp Firebase değişkenlerini doldurun.
 3. `npx expo start` ile projeyi başlatın; **Expo Go** veya emülatör kullanın.
 
-`CrudTest` ekranı yalnızca stack rotası olarak tanımlıdır; uygulama içinde ona yönlendiren bir menü yoktur. Gerekirse geçici olarak bir ekrandan `navigation.navigate('CrudTest')` ekleyerek veya React Navigation ile test ederek açabilirsiniz. MockAPI çağrıları için internet erişimi gerekir.
+`CrudTest` ekranı stack rotası olarak tanımlıdır; **Drawer menüsünden** "MockAPI CRUD Testi" ile açılabilir. MockAPI çağrıları için internet erişimi gerekir.
+
+Savunma ve gereksinim eşleştirmesi için bkz. [`SAVUNMA_NOTLARI.md`](SAVUNMA_NOTLARI.md).
 
 ---
 
