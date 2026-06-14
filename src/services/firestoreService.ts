@@ -211,6 +211,11 @@ function mapPost(id: string, data: Record<string, unknown>): FeedPost | null {
       ? {
           latitude: (loc as { latitude: number }).latitude,
           longitude: (loc as { longitude: number }).longitude,
+          ...((loc as { name?: unknown }).name &&
+          typeof (loc as { name: unknown }).name === 'string' &&
+          String((loc as { name: string }).name).trim()
+            ? { name: String((loc as { name: string }).name).trim() }
+            : {}),
         }
       : undefined;
   return {
@@ -542,10 +547,12 @@ export async function createMomentPost(
   text: string,
   imageUrl: string,
   location?: { latitude: number; longitude: number },
+  locationName?: string,
 ): Promise<string> {
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase yapılandırılmadı.');
   const body = text.trim();
+  const trimmedLocationName = locationName?.trim() ?? '';
   const hasImage = Boolean(imageUrl?.trim());
   const hasLocation = Boolean(location);
   if (!hasImage && !hasLocation) throw new Error('Fotoğraf veya konum gerekli.');
@@ -553,7 +560,10 @@ export async function createMomentPost(
   const ref = doc(collection(db, 'posts'));
 
   const payload: Record<string, unknown> = {
-    title: body.slice(0, 80) || (hasLocation ? 'Konum paylaşımı' : 'Anı'),
+    title:
+      trimmedLocationName ||
+      body.slice(0, 80) ||
+      (hasLocation ? 'Konum paylaşımı' : 'Anı'),
     excerpt: body,
     imageUrl: imageUrl?.trim() ?? '',
     category: 'moment' as PostCategory,
@@ -568,7 +578,11 @@ export async function createMomentPost(
   };
 
   if (location) {
-    payload.location = { latitude: location.latitude, longitude: location.longitude };
+    payload.location = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      ...(trimmedLocationName ? { name: trimmedLocationName } : {}),
+    };
   }
 
   await setDoc(ref, sanitizeData(payload as Record<string, unknown>));
@@ -1264,6 +1278,22 @@ export async function getCatalogRatingsByRefs(
     out[ratingKey('movie', id)] = v;
   });
   return out;
+}
+
+export async function getUserCatalogRating(
+  kind: CatalogRatingKind,
+  itemId: string,
+  userId: string,
+): Promise<number | null> {
+  const app = getFirebaseApp();
+  if (!app || !itemId.trim() || !userId.trim()) return null;
+  const db = getFirestore(app);
+  const col = ratingCollection(kind);
+  const userRatingRef = doc(db, col, itemId, 'ratings', userId);
+  const snap = await getDoc(userRatingRef);
+  if (!snap.exists()) return null;
+  const rating = Number((snap.data() as Record<string, unknown>).rating ?? 0);
+  return rating >= 1 && rating <= 5 ? rating : null;
 }
 
 export async function getMovieRatingsByIds(movieIds: string[]): Promise<Record<string, BookRatingSummary>> {

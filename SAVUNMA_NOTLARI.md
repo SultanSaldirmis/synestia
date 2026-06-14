@@ -6,34 +6,34 @@ Bu belge, final projesi savunmasında jüriye açıklanması gereken teknik terc
 
 ## 1. MVVM mimarisi (Kontrol listesi madde 16)
 
-**Durum:** Kısmen — proje genelinde resmi MVVM katmanı yok; katmanlı mimari uygulanmış.
+**Durum:** Kısmen — resmi MVVM sınıf adlandırması yok; katmanlı mimari + ekran model hook'ları uygulanmış.
 
 **Açıklama:**
 - **View:** `src/screens/` ve `src/components/` — yalnızca UI ve kullanıcı etkileşimi.
-- **Model / veri:** `src/services/` (`firestoreService.ts`, `authService.ts`, `apiService.ts`, `sqliteService.ts`) — Firestore, API ve SQLite erişimi.
-- **ViewModel benzeri:** `src/hooks/useProfileScreenModel.ts` — Profil ekranı için profil, beğeni, koleksiyon ve gönderi aboneliklerini ekrandan ayırır; `ProfileScreen.tsx` bu hook'u tüketir.
+- **Model / veri:** `src/services/` (`firestoreService.ts`, `authService.ts`, `apiService.ts`, `sqliteService.ts`, `mockApiService.ts`) — Firestore, API, SQLite ve MockAPI erişimi.
+- **ViewModel benzeri:** `src/hooks/useProfileScreenModel.ts` (Profil), `src/hooks/useExploreScreenModel.ts` (Keşfet arama/filtre) — abonelik ve arama mantığını ekrandan ayırır.
 
-Diğer ekranlar servis + React hook (`useState`, `useEffect`, `useCallback`) ile aynı ayrımı korur; tam MVVM yerine **pragmatik katmanlı yapı** tercih edilmiştir.
+Diğer ekranlar servis + React hook ile aynı ayrımı korur; **pragmatik katmanlı yapı** tercih edilmiştir.
 
-**Gösterilecek dosyalar:** `ProfileScreen.tsx`, `useProfileScreenModel.ts`, `firestoreService.ts`
+**Gösterilecek dosyalar:** `ProfileScreen.tsx`, `useProfileScreenModel.ts`, `ExploreScreen.tsx`, `useExploreScreenModel.ts`, `firestoreService.ts`
 
 ---
 
 ## 2. İçerik puanlama akışı (Kontrol listesi madde 7)
 
-**Durum:** Kısmen — puan verme gönderi oluşturma akışına entegre.
+**Durum:** Evet — kitap ve film için doğrudan puanlama + gönderi akışı.
 
 **Açıklama:**
 - Kitap ve film için yıldız puanı `CreatePostScreen` içinde verilir; puan `rateCatalogItem()` ile Firestore `bookRatings` / `movieRatings` alt koleksiyonlarına yazılır.
-- `ItemDetailScreen` katalog öğesinin **ortalama puanını** ve diğer kullanıcıların gönderi/yorumlarını listeler; doğrudan puan girişi yok — sosyal paylaşım odaklı tasarım.
+- `ItemDetailScreen` katalog öğesinin **ortalama puanını** gösterir ve giriş yapmış kullanıcıya **doğrudan yıldız puanlama** sunar (`getUserCatalogRating`, `rateCatalogItem`).
 - Müzik içeriği Spotify önizlemesi ile dinlenir; yıldız puanı kitap/film kategorisine özgüdür.
 
 **Demo adımları:**
-1. Keşfet → kitap veya film ara → seç.
-2. Gönderi oluştur → yıldız seç → paylaş.
-3. Aynı içeriğin detayında ortalama puanın güncellendiğini göster.
+1. Keşfet → kitap veya film ara → detay ekranına git.
+2. ItemDetail → yıldız seç → ortalama puanın güncellendiğini göster.
+3. Alternatif: Gönderi oluştur → yıldız seç → paylaş.
 
-**Gösterilecek dosyalar:** `CreatePostScreen.tsx`, `StarRating.tsx`, `ItemDetailScreen.tsx`, `firestoreService.ts` (`rateCatalogItem`)
+**Gösterilecek dosyalar:** `CreatePostScreen.tsx`, `ItemDetailScreen.tsx`, `StarRating.tsx`, `firestoreService.ts` (`rateCatalogItem`, `getUserCatalogRating`)
 
 ---
 
@@ -115,11 +115,11 @@ Index oluşturulmadan ItemDetail'de katalog yorumları boş kalabilir veya konso
 
 ## Hızlı demo sırası (5–7 dk)
 
-1. Giriş / kayıt (form doğrulama + Firebase Auth).
-2. Keşfet → film/kitap/müzik arama → detay.
+1. Giriş / kayıt (form doğrulama + Firebase Auth; girişte RN `Button`).
+2. Keşfet → film/kitap/müzik arama → ItemDetail’de doğrudan puan ver.
 3. Gönderi oluştur + puan ver → akışta gör.
 4. Drawer → Anı Kaydet → kamera + harita + MapPicker.
-5. Drawer → MockAPI CRUD Testi.
+5. Drawer → MockAPI CRUD Testi (GET/POST/PUT/DELETE).
 6. Profil → Dil değiştir (TR/EN).
 7. (İsteğe bağlı) Firebase Console → Firestore → Rules sekmesini göster.
 

@@ -27,6 +27,7 @@
 | `src/theme/` | Renkler, tipografi, `scale` / `verticalScale` (`pixelScale.ts`) |
 | `src/data/` | Mock veri ve tipler (`mockData.ts`) |
 | `src/config/` | Firebase yapılandırma yardımcıları |
+| `src/hooks/` | ViewModel benzeri ekran modelleri (`useProfileScreenModel.ts`, `useExploreScreenModel.ts`) |
 | `src/utils/` | Yardımcı fonksiyonlar (profil görseli, zaman formatı, vb.) |
 | `src/assets/` | Görseller |
 | `env.example` | `.env` için şablon |
@@ -96,8 +97,8 @@ Aşağıdaki tabloda her madde için **tek bir somut örnek** (dosya + satır) v
 | **StyleSheet** (`margin`, `padding`, `flex`, `flexDirection`, `justifyContent`, `alignItems`, `position`) | `LoginScreen.tsx` ~135–218 | Örn. `flex`, `paddingHorizontal`, `justifyContent`, `position: 'relative'`, `marginBottom` |
 | **Image** | `HomeScreen.tsx` ~452 | Marka / görsel |
 | **ImageBackground** | `LoginScreen.tsx` ~73 | Giriş arka planı |
-| **Button** (RN `Button`) | `LoginScreen.tsx` ~116 | “Giriş Yap” yerel düğmesi (ders maddesi) |
-| **Pressable** | `CrudTestScreen.tsx` ~167 | “Paylaş” / form aksiyonları |
+| **Button** (RN `Button`) | `LoginScreen.tsx` ~129 | “Giriş Yap” — React Native `Button` bileşeni |
+| **Pressable** | `CrudTestScreen.tsx` ~167 | Paylaş / form aksiyonları; ayrıca `DetailScreen.tsx`, `ItemDetailScreen.tsx` |
 | **TouchableOpacity** | `FilterChip.tsx` ~13 | Chip dokunma alanı |
 | **ScrollView** | `ExploreScreen.tsx` ~167 | Üst bölüm kaydırılabilir içerik |
 | **FlatList** | `HomeScreen.tsx` ~455 | Akış gönderi listesi |

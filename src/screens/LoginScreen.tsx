@@ -1,5 +1,6 @@
 import {
   Alert,
+  Button,
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
@@ -127,18 +128,15 @@ export function LoginScreen({ navigation }: Props) {
           {errors.password && <Text style={styles.fieldError}>{errors.password.message}</Text>}
 
           <View style={styles.submitBtn}>
-            <TouchableOpacity
+            <Button
+              title={t('auth.login')}
               onPress={() => void handleSubmit(onSubmit)()}
-              disabled={isSubmitting}
-              style={[styles.btn, isSubmitting && styles.btnDisabled]}
-              activeOpacity={0.85}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color={colors.textOnAccent} />
-              ) : (
-                <Text style={styles.btnText}>{t('auth.login')}</Text>
-              )}
-            </TouchableOpacity>
+              disabled={isSubmitting || !firebaseConfigured}
+              color={colors.accentPurple}
+            />
+            {isSubmitting ? (
+              <ActivityIndicator color={colors.accentPurple} style={styles.submitSpinner} />
+            ) : null}
           </View>
 
           <TouchableOpacity
@@ -218,17 +216,7 @@ const styles = StyleSheet.create({
     marginBottom: spacingVertical.sm,
   },
   submitBtn: { marginTop: spacingVertical.sm },
-  btn: {
-    backgroundColor: colors.accentPurple,
-    borderRadius: radii.md,
-    paddingVertical: spacingVertical.md,
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.7 },
-  btnText: {
-    ...typography.button,
-    color: colors.textOnAccent,
-  },
+  submitSpinner: { marginTop: spacingVertical.sm },
   linkWrap: { marginTop: spacingVertical.lg, alignItems: 'center' },
   link: { ...typography.subtitle, color: colors.accentBlue },
   forgotWrap: { marginTop: spacingVertical.sm, alignItems: 'center' },

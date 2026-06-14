@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -21,9 +21,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CachedImage, FilterChip, ScreenSafeArea, SearchBar, StarRating } from '../components';
 import type { PostCategory } from '../components';
 import { NO_SEARCH_IMAGE_URI } from '../constants/searchPlaceholder';
-import { isFirebaseConfigured } from '../config/firebase';
+import { useExploreScreenModel } from '../hooks/useExploreScreenModel';
 import type { MainTabParamList, RootStackParamList } from '../navigation/types';
-import { runExploreUnifiedSearch } from '../services/exploreUnifiedSearch';
 import type { SearchResult } from '../types/searchResult';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography } from '../theme';
@@ -55,6 +54,18 @@ export function ExploreScreen() {
   const navigation = useNavigation<ExploreNav>();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const {
+    query,
+    setQuery,
+    filter,
+    setFilter,
+    searching,
+    refreshing,
+    hasSearched,
+    filtered,
+    onSubmit,
+    onRefresh,
+  } = useExploreScreenModel();
 
   const typeLabel = (type: SearchResult['type']) => {
     if (type === 'user') return t('explore.user');
@@ -62,69 +73,6 @@ export function ExploreScreen() {
     if (type === 'movie') return t('explore.film');
     return t('explore.book');
   };
-
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const doSearch = useCallback(async (q: string) => {
-    const trimmed = q.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setHasSearched(false);
-      return;
-    }
-    setSearching(true);
-    setHasSearched(true);
-    try {
-      const rows = await runExploreUnifiedSearch(trimmed, {
-        includeUsers: isFirebaseConfigured(),
-      });
-      setResults(rows);
-    } catch (e) {
-      console.error('[Synestia][ExploreScreen] unified search threw', {
-        code: 'UNHANDLED',
-        message: e instanceof Error ? e.message : String(e),
-      });
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.trim().length < 2) {
-      setResults([]);
-      setHasSearched(false);
-      return;
-    }
-    debounceRef.current = setTimeout(() => {
-      void doSearch(query);
-    }, 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, doSearch]);
-
-  const onSubmit = useCallback(() => {
-    Keyboard.dismiss();
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    void doSearch(query);
-  }, [query, doSearch]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    doSearch(query).finally(() => setRefreshing(false));
-  }, [query, doSearch]);
-
-  const filtered =
-    filter === 'all' ? results : results.filter((item) => item.type === filter);
 
   const openResult = useCallback(
     (item: SearchResult) => {
@@ -185,7 +133,10 @@ export function ExploreScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder={t('explore.searchPlaceholder')}
-          onSubmitEditing={onSubmit}
+          onSubmitEditing={() => {
+            Keyboard.dismiss();
+            onSubmit();
+          }}
         />
 
         {hasSearched && (

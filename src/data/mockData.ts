@@ -30,7 +30,7 @@ export type FeedPost = {
   likesCount?: number;
   rating?: number;
   attachedContent?: AttachedContent;
-  location?: { latitude: number; longitude: number };
+  location?: { latitude: number; longitude: number; name?: string };
 };
 
 /** Keşfet kataloğu — detaya giderken tam metin için body. */

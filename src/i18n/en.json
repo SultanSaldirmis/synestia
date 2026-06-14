@@ -165,6 +165,8 @@
     "thoughtsPlaceholder": "What do you think about this content?",
     "starRating": "Star rating",
     "publicFeedHint": "Your post is subject to public feed rules.",
+    "openInMaps": "Open {{label}} in maps",
+    "mapsOpenFailed": "Could not open maps app.",
     "category": {
       "music": "Music",
       "movie": "Film",
@@ -216,7 +218,9 @@
     "mixed": "Mixed"
   },
   "rating": {
-    "notRatedYet": "Not rated yet"
+    "notRatedYet": "Not rated yet",
+    "yourRating": "Your rating",
+    "saved": "Your rating was saved."
   },
   "notifications": {
     "title": "Notifications",
@@ -293,6 +297,8 @@
     "momentDefaultTitle": "Moment",
     "momentNameLabel": "Moment name",
     "momentNamePlaceholder": "Moment — {{date}}",
+    "locationNameLabel": "Location name",
+    "locationNamePlaceholder": "e.g. Deneyap, Campus center",
     "photoCaptureFailed": "Could not take photo: {{error}}",
     "locationFailed": "Could not get location: {{error}}"
   },

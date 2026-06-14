@@ -72,7 +72,7 @@ export type PostCardProps = {
   averageRating?: number;
   totalRatings?: number;
   postRating?: number;
-  location?: { latitude: number; longitude: number };
+  location?: { latitude: number; longitude: number; name?: string };
 };
 
 const NEW_COLL_TYPES: CollectionThemeType[] = ['film', 'music', 'book', 'mixed'];
@@ -191,6 +191,11 @@ export function PostCard({
   // moment gönderileri imageUrl gösterir; text kategorisi imageUrl yoksa saf metin postu sayılır
   const isTextPost = !hasAttached && (category === 'text' || category === undefined) && !imageUrl?.trim();
   const isLocationOnlyMoment = category === 'moment' && !imageUrl?.trim() && Boolean(location);
+  const isPhotoMomentWithLocation = category === 'moment' && Boolean(imageUrl?.trim()) && Boolean(location);
+  const locationDisplayLabel = location
+    ? location.name?.trim() ||
+      `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+    : '';
   const showCommentBox = Boolean(onSubmitComment && onChangeCommentDraft !== undefined && commentDraft !== undefined);
   const avatarUri = profileImageDisplayUri(authorAvatarStored);
   const displayName = (authorName ?? t('common.defaultUser')).replace(/^@/, '').trim() || t('common.defaultUser');
@@ -273,7 +278,16 @@ export function PostCard({
         <View style={styles.locationBadge}>
           <Ionicons name="location" size={scale(20)} color={colors.accentPurple} />
           <Text style={styles.locationBadgeText} numberOfLines={1}>
-            {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+            {locationDisplayLabel}
+          </Text>
+        </View>
+      ) : null}
+
+      {isPhotoMomentWithLocation && location ? (
+        <View style={styles.locationInlineRow}>
+          <Ionicons name="location-outline" size={scale(14)} color={colors.accentPurple} />
+          <Text style={styles.locationInlineText} numberOfLines={1}>
+            {locationDisplayLabel}
           </Text>
         </View>
       ) : null}
@@ -697,6 +711,17 @@ const styles = StyleSheet.create({
   locationBadgeText: {
     ...typography.meta,
     color: colors.textSecondary,
+    flex: 1,
+  },
+  locationInlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginBottom: spacingVertical.xs,
+  },
+  locationInlineText: {
+    ...typography.meta,
+    color: colors.accentPurple,
     flex: 1,
   },
   bodyText: {

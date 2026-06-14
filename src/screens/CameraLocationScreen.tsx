@@ -36,6 +36,7 @@ import {
   saveContentToUserCollection,
   type UserCollectionDoc,
 } from '../services/firestoreService';
+import { processCameraPhoto } from '../utils/cameraPhotoProcessing';
 import { colors, spacing, spacingVertical, typography, radii, scale } from '../theme';
 
 // Gümüşhane Üniversitesi Müh. Fak. — MapPickerScreen varsayılan bölgesini kullanır
@@ -68,6 +69,7 @@ export function CameraLocationScreen({ navigation }: Props) {
   const [newCollName, setNewCollName] = useState('');
   const [savingColl, setSavingColl] = useState(false);
   const [momentTitle, setMomentTitle] = useState('');
+  const [locationName, setLocationName] = useState('');
 
   // -------- Kamera --------
 
@@ -87,20 +89,16 @@ export function CameraLocationScreen({ navigation }: Props) {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (!photo) return;
-      const manipulated = await ImageManipulator.manipulateAsync(
-        photo.uri,
-        [{ resize: { width: 800 } }, { crop: { originX: 0, originY: 0, width: 800, height: 800 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
-      );
-      setPhotoUri(manipulated.uri);
+      const manipulatedUri = await processCameraPhoto(photo.uri);
+      setPhotoUri(manipulatedUri);
       setShowCamera(false);
 
       const uid = user?.uid ?? 'anonymous';
       if (localId === null) {
-        const newId = await insertMoment({ uid, photoUri: manipulated.uri });
+        const newId = await insertMoment({ uid, photoUri: manipulatedUri });
         setLocalId(newId);
       } else {
-        await updateMomentPhoto(localId, manipulated.uri);
+        await updateMomentPhoto(localId, manipulatedUri);
       }
     } catch (e) {
       showMessage({ message: t('camera.photoCaptureFailed', { error: String(e) }), type: 'danger' });
@@ -252,10 +250,15 @@ export function CameraLocationScreen({ navigation }: Props) {
     const profile = await getUserProfileOnce(user.uid);
     const displayName = profile?.displayName || user.displayName || user.email?.split('@')[0] || t('common.defaultUser');
 
+    const trimmedLocationName = locationName.trim() || momentTitle.trim();
     const caption =
       shareText.trim() ||
-      momentTitle.trim() ||
       (locationCoords && !photoUri ? t('camera.locationShareDefault') : t('camera.momentDefaultCaption'));
+
+    const collectionTitle =
+      trimmedLocationName ||
+      momentTitle.trim() ||
+      (locationCoords && !photoUri ? t('camera.locationShareDefault') : t('camera.momentDefaultTitle'));
 
     const postId = await createMomentPost(
       user.uid,
@@ -263,14 +266,10 @@ export function CameraLocationScreen({ navigation }: Props) {
       caption,
       imageUrl,
       locationCoords ?? undefined,
+      trimmedLocationName || undefined,
     );
 
-    await saveMomentToCollection(
-      user.uid,
-      imageUrl,
-      postId,
-      momentTitle.trim() || (locationCoords && !photoUri ? t('camera.locationShareDefault') : t('camera.momentDefaultTitle')),
-    );
+    await saveMomentToCollection(user.uid, imageUrl, postId, collectionTitle);
 
     showMessage({ message: t('camera.momentPublished'), type: 'success' });
 
@@ -278,6 +277,7 @@ export function CameraLocationScreen({ navigation }: Props) {
     setLocationCoords(null);
     setShareText('');
     setMomentTitle('');
+    setLocationName('');
     setLocalId(null);
   }
 
@@ -610,44 +610,48 @@ export function CameraLocationScreen({ navigation }: Props) {
               <Text style={styles.locationBtnText}>{t('camera.gpsLocation')}</Text>
             </TouchableOpacity>
 
-            {locationCoords && !photoUri ? (
+            {locationCoords ? (
               <>
                 <View style={styles.momentTitleWrap}>
-                  <Text style={styles.momentTitleLabel}>{t('camera.momentNameLabel')}</Text>
+                  <Text style={styles.momentTitleLabel}>{t('camera.locationNameLabel')}</Text>
                   <TextInput
                     style={styles.shareInput}
-                    placeholder={t('camera.momentNamePlaceholder', { date: new Date().toLocaleDateString() })}
+                    placeholder={t('camera.locationNamePlaceholder')}
                     placeholderTextColor={colors.textMuted}
-                    value={momentTitle}
-                    onChangeText={setMomentTitle}
+                    value={locationName}
+                    onChangeText={setLocationName}
                     maxLength={60}
                   />
                 </View>
-                <Text style={styles.shareHint}>{t('camera.shareHint')}</Text>
-                <TextInput
-                  style={styles.shareInput}
-                  placeholder={t('camera.sharePlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  value={shareText}
-                  onChangeText={setShareText}
-                  multiline
-                  maxLength={280}
-                />
-                <TouchableOpacity
-                  style={[styles.publishBtn, publishing && styles.btnDisabled]}
-                  onPress={() => void publishLocationOnly()}
-                  disabled={publishing}
-                  activeOpacity={0.85}
-                >
-                  {publishing ? (
-                    <ActivityIndicator size="small" color={colors.textOnAccent} />
-                  ) : (
-                    <Ionicons name="location" size={scale(20)} color={colors.textOnAccent} />
-                  )}
-                  <Text style={styles.publishBtnText}>
-                    {publishing ? t('camera.publishing') : t('camera.shareLocationOnly')}
-                  </Text>
-                </TouchableOpacity>
+                {!photoUri ? (
+                  <>
+                    <Text style={styles.shareHint}>{t('camera.shareHint')}</Text>
+                    <TextInput
+                      style={styles.shareInput}
+                      placeholder={t('camera.sharePlaceholder')}
+                      placeholderTextColor={colors.textMuted}
+                      value={shareText}
+                      onChangeText={setShareText}
+                      multiline
+                      maxLength={280}
+                    />
+                    <TouchableOpacity
+                      style={[styles.publishBtn, publishing && styles.btnDisabled]}
+                      onPress={() => void publishLocationOnly()}
+                      disabled={publishing}
+                      activeOpacity={0.85}
+                    >
+                      {publishing ? (
+                        <ActivityIndicator size="small" color={colors.textOnAccent} />
+                      ) : (
+                        <Ionicons name="location" size={scale(20)} color={colors.textOnAccent} />
+                      )}
+                      <Text style={styles.publishBtnText}>
+                        {publishing ? t('camera.publishing') : t('camera.shareLocationOnly')}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
               </>
             ) : null}
           </View>

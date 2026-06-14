@@ -41,6 +41,7 @@ import {
 import type { FeedPost } from '../data/mockData';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { localizeMomentExcerpt } from '../utils/localizeMomentText';
+import { openExternalMap } from '../utils/openExternalMap';
 import { useAuthorAvatarMap } from '../hooks/useAuthorAvatarMap';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
 
@@ -92,6 +93,10 @@ export function DetailScreen() {
   const displayBody = livePost?.excerpt ?? body ?? description;
   const postAuthorUid = livePost?.authorUid ?? authorUid;
   const postLocation = livePost?.location;
+  const locationLabel = postLocation
+    ? postLocation.name?.trim() ||
+      `${postLocation.latitude.toFixed(5)}, ${postLocation.longitude.toFixed(5)}`
+    : null;
 
   const detailTextRaw =
     displayBody ?? 'Bu içerik için henüz açıklama eklenmedi.';
@@ -110,6 +115,10 @@ export function DetailScreen() {
     localizedDescription !== localizedTitle;
   const hideBodyDuplicate =
     displayCategory === 'moment' && normalizedBody === localizedTitle;
+  const titleMatchesLocation = Boolean(
+    postLocation && locationLabel && localizedTitle === locationLabel,
+  );
+  const showPrimaryTitle = !titleMatchesLocation;
   const isText =
     displayCategory === 'text' || (!displayImageUrl?.trim() && !postLocation);
 
@@ -441,7 +450,7 @@ export function DetailScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={styles.title}>{localizedTitle}</Text>
+            {showPrimaryTitle ? <Text style={styles.title}>{localizedTitle}</Text> : null}
             {catalogRef ? (
               <View style={styles.bookRatingRow}>
                 {typeof catalogRating?.averageRating === 'number' ? (
@@ -455,10 +464,23 @@ export function DetailScreen() {
               </View>
             ) : null}
             {showTagline ? <Text style={styles.tagline}>{localizedDescription}</Text> : null}
-            {postLocation ? (
-              <Text style={styles.coordsText}>
-                {postLocation.latitude.toFixed(5)}, {postLocation.longitude.toFixed(5)}
-              </Text>
+            {postLocation && locationLabel ? (
+              <Pressable
+                onPress={() =>
+                  void openExternalMap(
+                    postLocation.latitude,
+                    postLocation.longitude,
+                    postLocation.name,
+                    t('post.mapsOpenFailed'),
+                  )
+                }
+                style={({ pressed }) => [styles.locationLinkRow, pressed && styles.locationLinkPressed]}
+                accessibilityRole="link"
+                accessibilityLabel={t('post.openInMaps', { label: locationLabel })}
+              >
+                <Ionicons name="location" size={scale(titleMatchesLocation ? 22 : 18)} color={colors.accentPurple} />
+                <Text style={titleMatchesLocation ? styles.title : styles.locationLinkText}>{locationLabel}</Text>
+              </Pressable>
             ) : null}
             {!hideBodyDuplicate ? <Text style={styles.body}>{detailText}</Text> : null}
 
@@ -599,6 +621,19 @@ const styles = StyleSheet.create({
     ...typography.meta,
     color: colors.textSecondary,
     marginBottom: spacingVertical.sm,
+  },
+  locationLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacingVertical.sm,
+    alignSelf: 'flex-start',
+  },
+  locationLinkPressed: { opacity: 0.85 },
+  locationLinkText: {
+    ...typography.subtitle,
+    color: colors.accentPurple,
+    fontWeight: '600',
   },
   body: {
     ...typography.body,

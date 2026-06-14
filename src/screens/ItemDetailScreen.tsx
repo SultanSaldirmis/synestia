@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { showMessage } from 'react-native-flash-message';
 import { CachedImage, ScreenSafeArea, StarRating } from '../components';
+import { isFirebaseConfigured } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import type { AppStackParamList } from '../navigation/types';
 import {
   getCatalogRatingsByRefs,
+  getUserCatalogRating,
+  rateCatalogItem,
   subscribeGlobalContentComments,
   type GlobalContentCommentDoc,
 } from '../services/firestoreService';
@@ -24,17 +28,60 @@ export function ItemDetailScreen({ navigation, route }: Props) {
   const { itemType, itemId, title, imageUrl } = route.params;
   const [rows, setRows] = useState<GlobalContentCommentDoc[]>([]);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [ratingBusy, setRatingBusy] = useState(false);
+
+  const catalogItemId = itemType === 'movie' ? itemId.replace(/^tmdb_/, '') : itemId;
 
   useEffect(() => {
     return subscribeGlobalContentComments(itemType, itemId, setRows);
   }, [itemId, itemType]);
 
   useEffect(() => {
-    const ref = { kind: itemType, id: itemType === 'movie' ? itemId.replace(/^tmdb_/, '') : itemId } as const;
+    const ref = { kind: itemType, id: catalogItemId } as const;
     void getCatalogRatingsByRefs([ref]).then((map) => {
       setCatalogRating(map[`${ref.kind}:${ref.id}`] ?? null);
     });
-  }, [itemId, itemType]);
+  }, [catalogItemId, itemType]);
+
+  useEffect(() => {
+    if (!user?.uid || !isFirebaseConfigured()) {
+      setUserRating(null);
+      return;
+    }
+    void getUserCatalogRating(itemType, catalogItemId, user.uid).then(setUserRating);
+  }, [catalogItemId, itemType, user?.uid]);
+
+  const onRate = useCallback(
+    async (value: number) => {
+      if (!user?.uid) {
+        Alert.alert(t('common.error'), t('common.loginRequired'));
+        return;
+      }
+      if (!isFirebaseConfigured()) {
+        showMessage({ message: t('auth.serverUnavailable'), type: 'warning' });
+        return;
+      }
+      setRatingBusy(true);
+      try {
+        const summary = await rateCatalogItem(itemType, catalogItemId, user.uid, value);
+        setUserRating(value);
+        setCatalogRating({
+          averageRating: summary.averageRating,
+          totalRatings: summary.totalRatings,
+        });
+        showMessage({ message: t('rating.saved'), type: 'success' });
+      } catch (e) {
+        showMessage({
+          message: e instanceof Error ? e.message : t('common.actionFailed'),
+          type: 'danger',
+        });
+      } finally {
+        setRatingBusy(false);
+      }
+    },
+    [catalogItemId, itemType, t, user?.uid],
+  );
 
   const subtitle = useMemo(
     () =>
@@ -84,6 +131,17 @@ export function ItemDetailScreen({ navigation, route }: Props) {
           ) : (
             <Text style={styles.unrated}>{t('rating.notRatedYet')}</Text>
           )}
+          {user?.uid ? (
+            <View style={styles.userRateBlock}>
+              <Text style={styles.userRateLabel}>{t('rating.yourRating')}</Text>
+              <StarRating
+                rating={userRating ?? 0}
+                size={scale(16)}
+                onRate={(value) => void onRate(value)}
+              />
+              {ratingBusy ? <ActivityIndicator color={colors.accentPurple} size="small" style={styles.rateSpinner} /> : null}
+            </View>
+          ) : null}
         </View>
       </View>
       <FlatList
@@ -125,6 +183,9 @@ const styles = StyleSheet.create({
   itemTitle: { ...typography.subtitle, color: colors.textPrimary, fontWeight: '700' },
   itemMeta: { ...typography.meta, color: colors.textMuted, marginTop: spacingVertical.xs },
   ratingRow: { marginTop: spacingVertical.xs },
+  userRateBlock: { marginTop: spacingVertical.sm },
+  userRateLabel: { ...typography.caption, color: colors.textMuted, marginBottom: spacingVertical.xxs },
+  rateSpinner: { marginTop: spacingVertical.xxs },
   unrated: { ...typography.meta, color: colors.textMuted, marginTop: spacingVertical.xs },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacingVertical.xxl },
   row: {

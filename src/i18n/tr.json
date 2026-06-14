@@ -165,6 +165,8 @@
     "thoughtsPlaceholder": "Bu içerik hakkında ne düşünüyorsun?",
     "starRating": "Yıldız puanı",
     "publicFeedHint": "Gönderin herkese açık akış kurallarına tabidir.",
+    "openInMaps": "{{label}} — haritada aç",
+    "mapsOpenFailed": "Harita uygulaması açılamadı.",
     "category": {
       "music": "Müzik",
       "movie": "Film",
@@ -216,7 +218,9 @@
     "mixed": "Karışık"
   },
   "rating": {
-    "notRatedYet": "Henüz puanlanmadı"
+    "notRatedYet": "Henüz puanlanmadı",
+    "yourRating": "Puanın",
+    "saved": "Puanın kaydedildi."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -293,6 +297,8 @@
     "momentDefaultTitle": "Anı",
     "momentNameLabel": "Anı Adı",
     "momentNamePlaceholder": "Anı — {{date}}",
+    "locationNameLabel": "Konum adı",
+    "locationNamePlaceholder": "Örn. Deneyap, Kampüs merkezi",
     "photoCaptureFailed": "Fotoğraf çekilemedi: {{error}}",
     "locationFailed": "Konum alınamadı: {{error}}"
   },
