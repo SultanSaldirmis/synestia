@@ -167,6 +167,7 @@
     "publicFeedHint": "Your post is subject to public feed rules.",
     "openInMaps": "Open {{label}} in maps",
     "mapsOpenFailed": "Could not open maps app.",
+    "viewPhoto": "View full photo",
     "category": {
       "music": "Music",
       "movie": "Film",

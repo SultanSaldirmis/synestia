@@ -22,7 +22,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { CachedImage, ScreenSafeArea, StarRating } from '../components';
+import { CachedImage, ProfileImageZoomModal, ScreenSafeArea, StarRating } from '../components';
 import { isFirebaseConfigured } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList, AppStackParamList } from '../navigation/types';
@@ -81,6 +81,7 @@ export function DetailScreen() {
   const [replyTo, setReplyTo] = useState<PostCommentDoc | null>(null);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [zoomImageUri, setZoomImageUri] = useState<string | null>(null);
 
   const { width: windowWidth } = Dimensions.get('window');
   const heroHeight = roundLayout(Math.min(verticalScale(240), windowWidth * 0.58));
@@ -410,10 +411,16 @@ export function DetailScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {!isText && displayImageUrl?.trim() ? (
-            <CachedImage
-              uri={displayImageUrl}
-              style={[styles.hero, { height: heroHeight }]}
-            />
+            <Pressable
+              onPress={() => setZoomImageUri(displayImageUrl.trim())}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={t('post.viewPhoto')}
+            >
+              <CachedImage
+                uri={displayImageUrl}
+                style={[styles.hero, { height: heroHeight }]}
+              />
+            </Pressable>
           ) : postLocation ? (
             <MapView
               style={[styles.hero, { height: heroHeight }]}
@@ -563,6 +570,12 @@ export function DetailScreen() {
         ) : null}
       </KeyboardAvoidingView>
       )}
+      <ProfileImageZoomModal
+        visible={Boolean(zoomImageUri)}
+        imageUri={zoomImageUri ?? undefined}
+        onClose={() => setZoomImageUri(null)}
+        variant="content"
+      />
     </ScreenSafeArea>
   );
 }

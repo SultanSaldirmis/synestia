@@ -167,6 +167,7 @@
     "publicFeedHint": "Gönderin herkese açık akış kurallarına tabidir.",
     "openInMaps": "{{label}} — haritada aç",
     "mapsOpenFailed": "Harita uygulaması açılamadı.",
+    "viewPhoto": "Fotoğrafı büyüt",
     "category": {
       "music": "Müzik",
       "movie": "Film",
