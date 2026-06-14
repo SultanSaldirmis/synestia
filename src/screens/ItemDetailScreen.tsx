@@ -12,6 +12,7 @@ import {
   type GlobalContentCommentDoc,
 } from '../services/firestoreService';
 import { appLocaleFromI18n, formatRelativeTime } from '../utils/formatRelativeTime';
+import { useAuthorAvatarMap } from '../hooks/useAuthorAvatarMap';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { colors, radii, scale, spacing, spacingVertical, typography } from '../theme';
 
@@ -44,6 +45,12 @@ export function ItemDetailScreen({ navigation, route }: Props) {
     [itemType, rows.length, t],
   );
   const coverUri = imageUrl?.trim() || rows.find((x) => x.contentImageUrl?.trim())?.contentImageUrl || undefined;
+
+  const rowAuthorUids = useMemo(
+    () => [...new Set(rows.map((r) => r.authorUid).filter(Boolean))],
+    [rows],
+  );
+  const avatarMap = useAuthorAvatarMap(rowAuthorUids);
 
   const navigateToProfile = useCallback(
     (uid: string) => {
@@ -85,7 +92,7 @@ export function ItemDetailScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>{t('itemDetail.noComments')}</Text>}
         renderItem={({ item }) => {
-          const avatar = profileImageDisplayUri(item.authorProfileImageUrl);
+          const avatar = profileImageDisplayUri(avatarMap[item.authorUid] ?? item.authorProfileImageUrl);
           return (
             <View style={styles.row}>
               <Pressable

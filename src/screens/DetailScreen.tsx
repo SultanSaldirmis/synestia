@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -15,6 +15,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -40,6 +41,7 @@ import {
 import type { FeedPost } from '../data/mockData';
 import { profileImageDisplayUri } from '../utils/profileImage';
 import { localizeMomentExcerpt } from '../utils/localizeMomentText';
+import { useAuthorAvatarMap } from '../hooks/useAuthorAvatarMap';
 import { colors, radii, roundLayout, scale, spacing, spacingVertical, typography, verticalScale } from '../theme';
 
 type DetailRoute = RouteProp<RootStackParamList, 'Detail'>;
@@ -63,6 +65,7 @@ export function DetailScreen() {
   } = route.params;
   const { user, firebaseConfigured } = useAuth();
   const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [liked, setLiked] = useState(false);
   const [livePost, setLivePost] = useState<FeedPost | null>(null);
@@ -76,6 +79,7 @@ export function DetailScreen() {
   const [likeSubmitting, setLikeSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<PostCommentDoc | null>(null);
   const [catalogRating, setCatalogRating] = useState<{ averageRating: number; totalRatings: number } | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const { width: windowWidth } = Dimensions.get('window');
   const heroHeight = roundLayout(Math.min(verticalScale(240), windowWidth * 0.58));
@@ -126,6 +130,20 @@ export function DetailScreen() {
   }, [firebaseConfigured, id, user?.uid]);
 
   useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardInset(e.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isFirebaseConfigured()) return;
     missingHandledRef.current = false;
     setPostResolved(false);
@@ -145,6 +163,12 @@ export function DetailScreen() {
     if (!isFirebaseConfigured()) return;
     return subscribePostComments(id, setComments);
   }, [id]);
+
+  const commentAuthorUids = useMemo(
+    () => [...new Set(comments.map((c) => c.authorUid).filter(Boolean))],
+    [comments],
+  );
+  const avatarMap = useAuthorAvatarMap(commentAuthorUids);
 
   const commentCount = livePost?.commentCount ?? routeCommentCount ?? 0;
   const likesCountLive = livePost?.likesCount ?? 0;
@@ -298,7 +322,7 @@ export function DetailScreen() {
 
   const renderComment = (c: PostCommentDoc) => {
     const isReply = Boolean(c.parentId);
-    const avatarUri = profileImageDisplayUri(c.authorProfileImageUrl);
+    const avatarUri = profileImageDisplayUri(avatarMap[c.authorUid] ?? c.authorProfileImageUrl);
     return (
       <View key={c.id}>
         <View style={[styles.commentThreadRow, isReply && styles.commentReplyIndent]}>
@@ -368,6 +392,9 @@ export function DetailScreen() {
             styles.scrollContent,
             firebaseConfigured && user?.uid && Platform.OS === 'ios'
               ? { paddingBottom: spacingVertical.xxl + scale(120) }
+              : null,
+            Platform.OS === 'android' && keyboardInset > 0
+              ? { paddingBottom: keyboardInset + spacingVertical.lg }
               : null,
           ]}
           showsVerticalScrollIndicator={false}
@@ -465,7 +492,14 @@ export function DetailScreen() {
 
         {firebaseConfigured && user?.uid && livePost ? (
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.stickyCommentBar}>
+            <View
+              style={[
+                styles.stickyCommentBar,
+                Platform.OS === 'android' && keyboardInset > 0
+                  ? { marginBottom: keyboardInset - insets.bottom }
+                  : null,
+              ]}
+            >
               {replyTo ? (
                 <View style={styles.replyIndicator}>
                   <Text style={styles.replyIndicatorText} numberOfLines={1}>
@@ -485,9 +519,9 @@ export function DetailScreen() {
                   onChangeText={setCommentText}
                   multiline
                   onFocus={() => {
-                    if (Platform.OS === 'ios') {
+                    setTimeout(() => {
                       scrollRef.current?.scrollToEnd({ animated: true });
-                    }
+                    }, Platform.OS === 'android' ? 100 : 0);
                   }}
                 />
                 <Pressable

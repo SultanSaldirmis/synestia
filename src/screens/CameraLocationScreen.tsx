@@ -102,7 +102,6 @@ export function CameraLocationScreen({ navigation }: Props) {
       } else {
         await updateMomentPhoto(localId, manipulated.uri);
       }
-      showMessage({ message: t('camera.photoSaved'), type: 'success' });
     } catch (e) {
       showMessage({ message: t('camera.photoCaptureFailed', { error: String(e) }), type: 'danger' });
     }
